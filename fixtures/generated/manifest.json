@@ -800,6 +800,90 @@
       }
     },
     {
+      "file": "mode-church-c-dorian.jianpu",
+      "bytes": 127,
+      "description": "C Dorian written 首调 (1=Bb, the tonic is 2), as in mode-church-c-dorian.mid.",
+      "expect": {
+        "jianpu": {
+          "noteCount": 18,
+          "warnings": [],
+          "twin": "mode-church-c-dorian.mid"
+        },
+        "analysis": {
+          "top": {
+            "root": "C",
+            "scaleId": "dorian",
+            "name": "C Dorian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-zhi.jianpu",
+      "bytes": 109,
+      "description": "G 徵调式 (C 宫系统，五声) ending on 5, as in mode-pentatonic-c-gong-zhi.mid.",
+      "expect": {
+        "jianpu": {
+          "noteCount": 16,
+          "warnings": [],
+          "twin": "mode-pentatonic-c-gong-zhi.mid"
+        },
+        "analysis": {
+          "top": {
+            "root": "G",
+            "scaleId": "pentatonic-zhi",
+            "name": "G 徵调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "missing-degrees-cdega.jianpu",
+      "bytes": 142,
+      "description": "Only 1 2 3 5 6 in 1=C, as in missing-degrees-cdega.mid. The final bar is one beat long: a warning, not an error.",
+      "expect": {
+        "jianpu": {
+          "noteCount": 17,
+          "warnings": [
+            "BAR_DURATION_MISMATCH"
+          ],
+          "twin": "missing-degrees-cdega.mid"
+        },
+        "analysis": {
+          "top": {
+            "root": "C",
+            "scaleId": "pentatonic-gong"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR"
+          ],
+          "missingDegreesScaleIds": [
+            "ionian",
+            "lydian",
+            "mixolydian"
+          ]
+        }
+      }
+    },
+    {
       "file": "malformed-empty.mid",
       "bytes": 0,
       "description": "Zero bytes.",

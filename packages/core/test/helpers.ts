@@ -8,7 +8,7 @@ export interface ManifestEntry {
   file: string;
   description: string;
   expect: {
-    import: {
+    import?: {
       ok: boolean;
       errorCode?: string;
       format?: 0 | 1;
@@ -27,8 +27,9 @@ export interface ManifestEntry {
       codes: string[];
       repairable?: number;
     };
+    jianpu?: { noteCount: number; warnings: string[]; twin?: string };
     analysis?: {
-      trackId: string;
+      trackId?: string;
       top?: { root: string; scaleId: string; name?: string; aliases?: string[] };
       ambiguities: string[];
       absent?: string[];
@@ -52,6 +53,8 @@ export function notesOf(spec: Array<[number, number, number]>, ppq = 480): Melod
     pitch,
     startTick: Math.round(start * ppq),
     durationTick: Math.round(beats * ppq),
-    velocity: 0.75,
+    velocity: 96 / 127, // a 7-bit MIDI velocity, so export is exact
   }));
 }
+
+export const fixtureText = (file: string): string => readFileSync(`${FIXTURE_DIR}${file}`, 'utf8');

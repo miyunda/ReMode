@@ -676,6 +676,17 @@ v1 不包含 AI，也不部署任何 Worker / Pages Function。理由：
 - 解析器位于 `packages/core/src/text/jianpu.ts`，纯函数；CLI 与测试 fixture 优先使用简谱文本，比手工构造 MIDI 更易读、易审查。
 - 结果视图可切换以简谱显示（以目标调式主音为 `1` 或以宫音为 `1`，可选）。
 
+#### 10.8.1 `parseJianpu` 实现约定（M1a，解析器版本 `remode-jianpu/1.0.0`）
+
+上述子集的具体化，细节与理由见 `docs/decisions/m1a-implementation-notes.md`：
+
+- **参照八度**：无八度标记的 `1` 是调号音在科学音高第 4 八度上的音（`1=C` → C4 = MIDI 60，`1=G` → G4 = 67，`1=Bb` → Bb4 = 70，`1=Cb` → Cb4 = 59）。每个 `'` / `,` 升/降 12 个半音。
+- **时值**：PPQ 固定为 480。不带记号的数字为四分音符（一拍 = 480 tick），与拍号分母无关；`_` 减半、`__` 为四分之一，`.` 增加基本时值的一半，独立的 `-` 给前一个音或休止增加一拍（可跨小节线）。
+- **头部**：`1=<音名>`（字母不分大小写，后缀 `#` / `b` / `♯` / `♭`）、`<n>/<d>` 拍号、速度 `bpm=<n>` 或 `♩=<n>`（两种写法等价，默认 120）。头部只能出现在第一个音之前；中途换调、换拍号、换速度不支持（`HEADER_AFTER_NOTES`）。缺调号按 `1=C`、缺拍号按 4/4，并给出警告。
+- **其他**：`//` 起行注释；`||` 视同一条小节线；记号之间可不留空格（`1_2_3_`）；固定力度 96/127；音符 ID 为 `jianpu:n<k>`（按出现顺序，休止不占号）。
+- **错误与警告**：错误一律带 `line`、`column`（1 起）与代码，解析会报告全部错误而非只报第一个。连音、圆括号/方括号/花括号 → `UNSUPPORTED_TUPLET`，`~ ^ * tr` 等 → `UNSUPPORTED_ORNAMENT`，`|:` `:|` `%` → `UNSUPPORTED_REPEAT`，三条减时线与双附点 → `UNSUPPORTED_DURATION`，重升重降 → `UNSUPPORTED_ACCIDENTAL`。小节时值与拍号不符只是 `BAR_DURATION_MISMATCH` 警告（含弱起小节）。
+- **限制**：文本 ≤ 100 000 字符、音符 ≤ 20 000，与 MIDI 导入一致。
+
 ---
 
 ## 11. MIDI 导出设计
@@ -686,7 +697,8 @@ v1 不包含 AI，也不部署任何 Worker / Pages Function。理由：
 - **Key Signature 决策**：按记谱惯例写入**目标音集对应的调号**（如 D Dorian → 0 升降号，写作 C major；D 徵调式（G 宫系统）→ 1 升号）；五声/六声按其所属宫系统的七声调号写。MIDI 调号仅有大/小调字段，实际调式记录在导出报告（及可选的 Text / Marker 元事件）中。用户可选择“保留原标记”或“省略”。
 - 不把秒数重新量化成 Tick；避免持续多轮修改后的节奏漂移。
 - 对只改音高操作验证所有 `id` 的 `startTick`、`durationTick`、`velocity` 完全相同。
-- 输出命名：`<source>-<root>-<mode>-<variant>.mid`，避免文件名非法字符。
+- 输出命名：`<source>-<root>-<mode>-<variant>.mid`，避免文件名非法字符。实现（`exportFileName`）：去掉源扩展名，`#` 写作 `sharp`，只保留字母、数字、`.`、`_`、`-`，每段 ≤ 60 字符，缺省的段省略，源名为空时用 `melody`。
+- **M1a 实现**：`exportMidi` 写 format 1（指挥轨 + 一条旋律轨）。键号策略 `source`（默认，保留来源调号）/ `omit` / `mode`（写目标音集调号，并在 tick 0 写 Text 元事件 `ReMode mode: <调式名> [<scaleId>]`）。速度按整数微秒写入、力度按 7 位写入；无法精确写入的数据（非整数微秒速度、非 7 位力度、0 力度、不可编码的调号、调用方声明的弯音/CC64/其他轨）都以结构化警告报告，非法数据（音高越界、非整数 tick 等）为结构化错误。
 - 支持单版本输出及批量导出（zip 可作为后续功能）。
 
 ### 11.2 信息保真边界
@@ -820,14 +832,16 @@ Invariant G:
 
 ### M1 — Strict Transform, 简谱解析 & MIDI Export
 
+> 拆为两个 PR：**M1a** 只做输入/输出（简谱解析、MIDI 导出、round-trip、CLI `analyze` 简谱输入与 `export`），不做任何音高变换；**M1b** 做 Strict 换调式与移调。
+
 - [ ] 同主音换调式（默认）：按音级身份映射，7→7、5→5、5→7、7→5 与可配置调外音策略。
 - [ ] Chromatic Transpose，正确处理负音程和八度。
 - [ ] 特征音曝光检查（`NO_CHARACTERISTIC_DEGREE`）。
-- [ ] 简谱文本解析器（10.8 子集）；CLI 与 fixture 支持简谱输入。
-- [ ] 导出 MIDI；保留 Tick、Tempo、拍号、力度等支持的数据；按 11.1 写调号。
+- [x] 简谱文本解析器（10.8 子集）；CLI 与 fixture 支持简谱输入。（M1a）
+- [x] 导出 MIDI；保留 Tick、Tempo、拍号、力度等支持的数据；按 11.1 写调号。（M1a）
 - [ ] 音域软限制与导出前冲突提示。
 - [ ] CLI：`analyze`、`transpose`、`remode --strategy strict`，均支持 `.mid` 与简谱文本。
-- [ ] Round-trip fixture 测试；分析器回检断言。
+- [ ] Round-trip fixture 测试；分析器回检断言。（M1a 已完成 round-trip；回检随 M1b）
 
 **DoD**：针对核心 fixture 生成正确 Strict MIDI；只改音高的不变量全部通过。
 
