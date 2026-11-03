@@ -1,4 +1,5 @@
-# Cloudflare Pages response headers (also applied by `vite preview`, see vite.config.ts).
+# Response headers for Workers static assets (also applied by `vite preview`, see vite.config.ts).
+# The file itself is not served. Limits: 100 rules, 2 000 characters per line.
 # Static app, no backend: everything is same-origin and nothing is fetched at runtime.
 /*
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'

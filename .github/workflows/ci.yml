@@ -25,6 +25,10 @@ jobs:
       - run: pnpm build
       - name: Smoke-test the built CLI (catches ESM/CJS interop that Vitest hides)
         run: pnpm smoke
+      - name: Validate the Workers static-assets config (no credentials, uploads nothing)
+        run: pnpm exec wrangler deploy --dry-run
+        env:
+          WRANGLER_SEND_METRICS: 'false'
       # Browser E2E against the production build (vite preview with the Pages
       # _headers CSP). Kept in `check` so branch protection needs no new job.
       - name: Install Playwright Chromium

@@ -21,3 +21,6 @@ corpus/
 playwright-report/
 test-results/
 blob-report/
+
+# Wrangler local state
+.wrangler/

@@ -3,7 +3,7 @@
 > **Same Melody. Different Mood.**  
 > 项目状态：产品与技术规格草案 v1.1  
 > 更新日期：2026-11-03  
-> 目标：纯浏览器端、Local-first、可离线、可解释、可导出的旋律实验室（Cloudflare Pages 静态部署）
+> 目标：纯浏览器端、Local-first、可离线、可解释、可导出的旋律实验室（Cloudflare Workers 静态资源部署，ADR-017）
 >
 > **v1.1 主要变更**：调式识别改为“音集 + 主音”两步法；默认操作为同主音换调式；新增特征音显著度与动机绑定；首发支持全部七个教会调式与中国六声/七声数据结构；试听加入主音持续低音（drone）；新增简谱文本输入；AI 移出 v1。见第 15 章 ADR-004、ADR-007、ADR-012～ADR-016。
 
@@ -23,7 +23,7 @@ ReMode 是一个以 **单声部旋律（monophonic melody）** 为核心的 MIDI
 4. **Explainable**：每个自动改动都能够展示原因、前后音高、代价/约束。
 5. **Honest uncertainty**：调式识别是推断，不能将相关系数当作真实概率。结果有歧义时主动显示候选并支持人工指定。
 6. **Export fidelity**：默认只改音高，保留时间 Tick、持续 Tick、力度、速度图谱、拍号等，除非用户明确选择进一步编辑。
-7. **Cloudflare-friendly**：纯静态应用部署在 Cloudflare Pages；v1 无后端、无 Worker、无密钥。
+7. **Cloudflare-friendly**：纯静态应用，以 Cloudflare Workers 静态资源项目部署（ADR-017）；v1 不写任何服务端代码：无 Worker 脚本、无绑定、无密钥。
 8. **Audible modality**：单旋律缺少和声参照时调式差异不易听出；试听提供可开关的主音持续低音（drone），让调式色彩可被听见。
 
 **项目非目标（首发不做）**：从 WAV/MP3 直接识别音符、复杂复音或完整和声编配、专业 DAW 级别编辑、无条件保证传统中国调式的风格真实性、替代音频母带工具。
@@ -99,7 +99,7 @@ ReMode 是一个以 **单声部旋律（monophonic melody）** 为核心的 MIDI
 | 状态 | React Context + reducer 或 Zustand | 原曲、版本、播放器、操作历史分离 |
 | 算法 | 纯 TypeScript、无 DOM 依赖 | CLI、浏览器和测试共享 |
 | 计算 | Web Worker（可选） | 较长旋律分析/搜索不阻塞 UI |
-| 前端部署 | Cloudflare Pages | 纯静态站点；v1 无 Functions / Workers |
+| 前端部署 | Cloudflare Workers 静态资源（Workers Builds） | 仅资源、无 Worker 脚本（`wrangler.jsonc` 无 `main`）；为以后的服务端代码预留，无需迁移（ADR-017） |
 | 测试 | Vitest + Playwright | 单元、属性、端到端 |
 | PWA | Vite PWA 插件（后期） | 版本化缓存；不要默认缓存敏感 MIDI |
 
@@ -185,11 +185,12 @@ remode/
 │   └── decisions/
 ├── package.json
 ├── pnpm-workspace.yaml
+├── wrangler.jsonc        # Workers 静态资源配置（仅 assets，无 main）
 ├── README.md
 └── LICENSE
 ```
 
-> 配置细节（尤其 Pages 的配置文件字段）在实际开发时以当时官方文档为准。不要把原本可本地执行的功能迁到服务端。
+> 配置细节（尤其 `wrangler.jsonc` 字段）在实际开发时以当时官方文档为准。不要把原本可本地执行的功能迁到服务端。
 
 ---
 
@@ -604,7 +605,7 @@ UI 展示“为何这处改成 A4”，并支持回退单个修改。
 
 ## 9. AI（移出 v1，列入 Future）
 
-v1 不包含 AI，也不部署任何 Worker / Pages Function。理由：
+v1 不包含 AI，也不写任何服务端代码：部署形态是只含静态资源的 Worker（ADR-017），没有 Worker 脚本、Functions、密钥或绑定。理由：
 
 - LLM 生成符号化音高序列的可靠性低，大部分工作量会花在校验、限流、隐私与成本控制上，而非改写质量本身。
 - 决定“改写是否好听”的是调式定义、特征音显著度、动机处理与试听方式（第 6–8、10 章），应优先投入。
@@ -814,8 +815,8 @@ Invariant G:
 
 ### 13.1 基础部署
 
-- GitHub 仓库连接 Cloudflare Pages 自动构建发布；v1 为纯静态资源，无 Functions / Workers、无服务端密钥。
-- 配置环境分离（local / preview / production）。
+- GitHub 仓库连接 Cloudflare Workers Builds 自动构建发布：项目 `remode`，根目录 `wrangler.jsonc` 只声明 `assets`（`apps/web/dist`，`not_found_handling: single-page-application`），没有 `main` 脚本、绑定或密钥（ADR-017）。安全响应头（CSP）由 `apps/web/public/_headers` 提供，Workers 静态资源支持该文件。
+- 环境分离：local（`vite dev` / `vite preview` / `wrangler dev`）、preview（非生产分支的 Workers Preview 构建）、production（`main`）。
 
 ### 13.2 安全
 
@@ -869,7 +870,7 @@ Invariant G:
 
 ### M2 — Browser Workbench
 
-> 拆为三个 PR：**M2a** Web 骨架、导入、分析视图、最小 TARGET 与下载、Cloudflare Pages 就绪；**M2b** Piano Roll、差异高亮、手动修音与撤销；**M2c** Tone.js 试听、共享 Transport、drone。
+> 拆为三个 PR：**M2a** Web 骨架、导入、分析视图、最小 TARGET 与下载、Cloudflare 部署就绪（Workers 静态资源）；**M2b** Piano Roll、差异高亮、手动修音与撤销；**M2c** Tone.js 试听、共享 Transport、drone。
 
 - [x] React/Vite/Tailwind 页面与 Rosé Pine Dawn/Dark 配色。（M2a：跟随系统，可手动切换并保存）
 - [x] 拖拽 MIDI、简谱文本输入、轨道选择、预检反馈、来源调式纠正。（M2a，见 `docs/decisions/m2a-implementation-notes.md`）
@@ -909,7 +910,7 @@ Invariant G:
 - [ ] PWA 离线缓存与更新提示。
 - [ ] 键盘快捷键、移动适配、性能优化。
 - [ ] README、演示 MIDI/简谱、帮助文档、支持矩阵和隐私政策。
-- [ ] Pages Preview → 正式域名部署；构建/测试/发布流程。
+- [ ] Workers Preview → 正式域名部署；构建/测试/发布流程。
 
 **DoD**：可公开分享、无账号可完成核心流程，文件限制与隐私行为可理解。
 
@@ -946,6 +947,7 @@ Invariant G:
 | ADR-014 | 试听提供主音持续低音（drone） | 单旋律缺少和声参照，调式色彩需要参照音才能被听见 |
 | ADR-015 | 首发支持全部教会调式与中国六声/七声，命名采用“宫系统 + 主音” | 旋转实现成本极低；中国调式需双坐标才能准确描述 |
 | ADR-016 | 支持简谱文本输入，fixture 优先用简谱 | 首调体系与音级概念一致；降低输入门槛；测试素材可读可审查 |
+| ADR-017 | 以 Cloudflare Workers 静态资源项目部署（仅 assets，无 Worker 脚本），取代 Pages | 以后加入服务端代码（AI 代理、分享链接）只需在同一项目加 `main`，无需从 Pages 迁移；v1 仍不写服务端代码，加任何脚本、Functions、密钥或绑定都须先立新 ADR（规则 7） |
 
 ---
 
@@ -998,7 +1000,7 @@ Invariant G:
 
 - Tone.js MIDI 项目：<https://github.com/Tonejs/Midi>
 - Tone.js：<https://tonejs.github.io/>
-- Cloudflare Pages：<https://developers.cloudflare.com/pages/>
+- Cloudflare Workers 静态资源：<https://developers.cloudflare.com/workers/static-assets/>；Workers Builds：<https://developers.cloudflare.com/workers/ci-cd/builds/>
 - Essen Folksong Collection（`**kern`，CCARH 许可，见 12.2）：<https://github.com/ccarh/essen-folksong-collection>
 - David Temperley, *Music and Probability*（MIT Press, 2007）：单声部概率调性模型
 - MIDI Association：<https://midi.org/>

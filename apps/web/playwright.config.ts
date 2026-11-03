@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
+// Set E2E_BASE_URL to run against an already running server (e.g. `wrangler dev`).
+const external = process.env.E2E_BASE_URL;
 const screenshots = !!process.env.SCREENSHOTS;
 
 // E2E runs against the production build served by `vite preview`, which also
@@ -12,7 +14,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: external ?? `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
   },
   // `pnpm screenshots` regenerates docs/screenshots/m2a; it is not part of the suite.
@@ -28,10 +30,14 @@ export default defineConfig({
       grep: screenshots ? /@screenshots/ : /@phone/,
     },
   ],
-  webServer: {
-    command: `pnpm exec vite build && pnpm exec vite preview --port ${PORT} --strictPort`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  ...(external
+    ? {}
+    : {
+        webServer: {
+          command: `pnpm exec vite build && pnpm exec vite preview --port ${PORT} --strictPort`,
+          url: `http://localhost:${PORT}`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+        },
+      }),
 });

@@ -1,7 +1,7 @@
 # M2a 实现记录与规格偏差
 
 状态：随 `feat/m2a-web-import-analysis` 引入。新增 `@remode/web` 0.1.0；core 无改动，`analysisVersion`（`remode-mode-2step/0.2.0`）、`remode-strict/1.1.0`、`remode-transpose/1.0.0`、`remode-jianpu/1.0.0` 都不变。
-M2a 只做 Web 骨架、导入、分析视图、最小 TARGET（Strict 生成、逐音 diff、回检与下载）以及 Cloudflare Pages 就绪。不做 Piano Roll、试听、drone、手动修音、撤销、Expressive 和 PWA。
+M2a 只做 Web 骨架、导入、分析视图、最小 TARGET（Strict 生成、逐音 diff、回检与下载）以及 Cloudflare 部署就绪（Workers 静态资源，见 §5）。不做 Piano Roll、试听、drone、手动修音、撤销、Expressive 和 PWA。
 本文件记录对规格（`docs/ReMode-Development-Plan.md` §3、§5、§6.5、§10、§11.1、§13、§14 M2）的具体化与偏差（CLAUDE.md 规则 10）。
 
 ## 1. 结构
@@ -13,7 +13,8 @@ M2a 只做 Web 骨架、导入、分析视图、最小 TARGET（Strict 生成、
 | `apps/web/src/lib/exportVariant.ts` | `exportMidi` + `exportFileName`，用 Blob URL 下载 |
 | `apps/web/src/lib/labels.ts` | 每个结构化代码对应的中文名称，以及按字段生成的校验说明 |
 | `apps/web/src/components/*` | 视图组件；业务计算都在 reducer 里，组件不做计算 |
-| `apps/web/public/_headers` | Pages 响应头（CSP 等）。`vite preview` 读取同一文件 |
+| `apps/web/public/_headers` | 静态资源响应头（CSP 等）。`vite preview` 读取同一文件 |
+| `wrangler.jsonc` | Workers 静态资源配置：只有 `assets`，没有 `main` |
 
 ## 2. 决定与理由
 
@@ -60,13 +61,17 @@ core 已经符合规则 3：没有 `Buffer`、没有 `node:*`，ESLint 也会阻
 
 构建产物中唯一出现 `fetch` 的地方有两处：`@tonejs/midi` 的 `Midi.fromUrl`（死代码），以及 Vite 的 modulepreload polyfill（同源）。运行时没有网络请求，由 E2E 断言：页面加载完成后不得再发出任何 HTTP 请求，任何时候都不得访问其他源，不得出现 console error 或 CSP violation。
 
-## 5. CSP 与 Cloudflare Pages
+## 5. CSP 与 Cloudflare 部署（Workers 静态资源，ADR-017）
 
-- `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`，另加 `nosniff`、`no-referrer`、`Permissions-Policy`、`COOP`、`X-Frame-Options: DENY`；`/assets/*` 长缓存（文件名带哈希）。
+最初按 Cloudflare Pages 准备。在同一 PR 中改为 **只含静态资源的 Worker**：用户决定为以后的服务端代码（AI 代理、分享链接）预先选定 Workers 形态，届时只需在同一项目中加 `main`，不必从 Pages 迁移。v1 仍然不写服务端代码（CLAUDE.md 规则 7 已同步修改）。
+
+- `wrangler.jsonc`：`name: "remode"`、`compatibility_date: "2026-10-19"`、`assets.directory: "./apps/web/dist"`、`assets.not_found_handling: "single-page-application"`。没有 `main`、绑定或 vars。日期不晚于所锁定 wrangler（4.151.2）内置的 workerd 版本。Cloudflare 文档中仅含资源的 SPA 示例正是这几个字段。没有脚本时，所有请求都直接交给资源服务，`run_worker_first` 和 `Sec-Fetch-Mode` 的问题不会出现。
+- `wrangler` 4.151.2 锁定为根 devDependency，部署命令用 `pnpm exec wrangler …`，不用 `npx` 临时下载。pnpm 12 会把被忽略的构建脚本当作安装错误（`ERR_PNPM_IGNORED_BUILDS`），所以在 `pnpm-workspace.yaml` 的 `allowBuilds` 中加了 `workerd: false`。workerd 与 esbuild 一样以可选依赖提供各平台的预编译二进制，不需要 postinstall。本机 `wrangler dev` 正常运行即为证明。
+- CSP：`default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`，另加 `nosniff`、`no-referrer`、`Permissions-Policy`、`COOP`、`X-Frame-Options: DENY`；`/assets/*` 长缓存（文件名带哈希）。Workers 静态资源支持 `_headers`，语法与 Pages 相同（最多 100 条规则、每行 2 000 字符），文件本身不会被当作资源提供，所以无需修改。注意：`_headers` 只作用于静态资源响应；以后若加入 Worker 脚本，脚本生成的响应须自行设置这些头。
 - React 的 `style` 属性通过 CSSOM 设置，不受 `style-src` 限制；构建中没有内联 `<style>` 或 `<script>`（开发服务器不发送 CSP，所以不受影响）。
 - `vite preview` 读取同一份 `_headers` 中 `/*` 段的头，E2E 因而在生产 CSP 下运行。
-- 不提供 `_redirects`：Pages 在没有顶层 `404.html` 时自动按 SPA 处理（Cloudflare 文档 “Serving Pages → Single-page application”）。M2a 也只有一个路由。
-- 构建镜像 v3 默认 Node 22、pnpm 10.11。它从 `.node-version` 或 `NODE_VERSION` 读取 Node 版本，但不从 `packageManager`、lockfile 或 `engines` 推断 pnpm 版本（Cloudflare 文档 “Build image → v3 limitations”）。因此新增 `.node-version`（`24`，CI 也改为读取它），并要求在面板中设置 `PNPM_VERSION=12.16.1`。具体面板设置见 README。
+- 本地校验：`pnpm build && pnpm exec wrangler deploy --dry-run` 读取了 8 个资源文件，报告“No bindings found”。`wrangler dev`（workerd）返回了 `_headers` 中的全部头，深层路径返回 `index.html` 和 200，请求 `/_headers` 也是如此（文件未被提供）。设置 `E2E_BASE_URL=http://127.0.0.1:8787` 后，8 个桌面 E2E 用例对着 `wrangler dev` 全部通过。开发机上没有 Cloudflare 凭据，也从未在开发机上部署。
+- Workers Builds 的版本选择（Cloudflare 文档 “Workers Builds → Build image”）：Node 读取 `.node-version`（`24`，与镜像默认值相同）；pnpm 经 Corepack 按 `packageManager`（`pnpm@12.16.1`）选择，该字段优先于 `PNPM_VERSION`，所以不需要任何构建变量。这一点与 Pages v3 镜像不同：Pages 不读 `packageManager`，必须设置 `PNPM_VERSION`。非生产分支的默认 Preview 命令是 `wrangler preview`，它生成 Preview URL（锁定版本中为 open beta）；`wrangler versions upload` 生成的是 Version URL。
 
 ## 6. 测试
 

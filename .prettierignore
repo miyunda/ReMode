@@ -7,3 +7,4 @@ corpus/
 *.md
 playwright-report/
 test-results/
+.wrangler/

@@ -10,7 +10,7 @@ runtime.
 | `src/state/project.ts` | Reducer: parsed input, the deep-frozen original, settings and the generated variant are kept in separate slots. Pure; `createdAt` comes in the action. |
 | `src/lib/` | Loading files and text (`loadInput`), limits, mode pickers, Chinese labels for core codes, export and download, theme preference. |
 | `src/components/` | Import, track list, validation and repair, source mode, target, change inspector, analysis and PCD chart. |
-| `public/_headers` | Cloudflare Pages headers (CSP). `vite preview` sends them too. |
+| `public/_headers` | Response headers (CSP) for Workers static assets. `vite preview` sends them too. |
 | `test/` | Vitest + Testing Library (jsdom): reducer, components, AA contrast of the colour tokens. |
 | `e2e/` | Playwright against `vite build && vite preview`: workflow, uploads, errors, theme, keyboard, phone layout, plus a no-network/no-CSP-violation guard on every test. |
 

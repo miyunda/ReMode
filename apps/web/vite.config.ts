@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 /**
- * Headers from `public/_headers` (the file Cloudflare Pages serves) for the
+ * Headers from `public/_headers` (served by Workers static assets) for the
  * `/*` rule, so `vite preview` and the E2E suite run under the production CSP.
  */
 function pagesHeaders(): Record<string, string> {

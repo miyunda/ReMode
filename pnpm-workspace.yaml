@@ -7,6 +7,8 @@ minimumReleaseAgeExclude:
   - '@vitest/spy@5.1.0'
   - vitest@5.1.0
 
-# esbuild ships prebuilt platform binaries as optional deps; its postinstall is not needed.
+# esbuild and workerd (wrangler) ship prebuilt platform binaries as optional deps;
+# their postinstall scripts are not needed.
 allowBuilds:
   esbuild: false
+  workerd: false

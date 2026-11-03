@@ -7,7 +7,7 @@
 4. **不要暗改时值**：任何自动清洗行为必须经过明确函数与记录；pitch-only 路径绝不修改 timing。
 5. **每次只实现一个封闭的垂直切片**：可运行、可导出、可回归测试。
 6. **算法变更要可追踪**：权重、评分/搜索策略和版本编号进入报告，避免无法复现。
-7. **v1 无后端、无 AI**：不引入 Worker、Pages Function、AI provider 或任何密钥（ADR-007）；如需重新引入须先立新 ADR。
+7. **v1 无后端、无 AI**：v1 不写任何服务端代码。部署为只含静态资源的 Worker（ADR-017，根目录 `wrangler.jsonc` 只有 `assets`）：不加 Worker 脚本（`main`）、Functions、密钥、AI provider 或任何存储/服务绑定（ADR-007）；加入其中任何一项都须先立新 ADR。
 8. **避免一口气实现所有 UI**：优先导入→检测→转换→试听→导出，随后增强。
 9. **每个 PR 给出**：设计摘要、受影响的不变量、测试结果、截图或示例 MIDI（如适用）、已知限制。
 10. **规范更新**：功能与实际行为不一致时，应更新本文件和 ADR，而不是让文档成为历史遗迹。
@@ -29,10 +29,11 @@
 
 ### 分支与发布流程
 
-- **不直接提交到 `main`**。`main` 是 Cloudflare 生产分支，受分支保护（含管理员）：只能通过 GitHub PR 合并更新。
-- 每个切片从最新的 `main` 拉出功能分支，命名为 `feat/...`（如 `feat/m1a-jianpu-export`）；没有长期的 `dev` 分支。推送后由 Cloudflare 自动生成预览部署。
+- **不直接提交到 `main`**。`main` 是 Cloudflare Workers 的生产分支，受分支保护（含管理员）：只能通过 GitHub PR 合并更新。
+- 每个切片从最新的 `main` 拉出功能分支，命名为 `feat/...`（如 `feat/m1a-jianpu-export`）；没有长期的 `dev` 分支。推送后由 Cloudflare Workers Builds 自动生成预览构建（Preview URL）。
 - 预览站验收通过后，在 GitHub 上开 PR 合并到 `main`，合并后自动发布生产。
-- CI 的 `check` 任务（typecheck / lint / test / build / smoke）必须在 PR 上全绿才能合并。
+- CI 的 `check` 任务（typecheck / lint / test / build / smoke / e2e）必须在 PR 上全绿才能合并。
+- 本地可用 `pnpm build && pnpm exec wrangler deploy --dry-run` 校验部署配置；不要从开发机直接部署，也不要在仓库或开发机上放 Cloudflare 凭据。
 
 ### 建议的首个 Agent 任务
 

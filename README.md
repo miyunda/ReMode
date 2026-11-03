@@ -237,34 +237,53 @@ anywhere. The piano roll and playback areas are labelled placeholders.
 | Notes in the melody being processed (selected track or jianpu) | 5 000 | `MELODY_TOO_LONG` / `TOO_MANY_NOTES` |
 | Jianpu text | 100 000 characters | `TEXT_TOO_LONG` |
 
-### Deploying to Cloudflare Pages
+### Deploying to Cloudflare (Workers static assets)
 
-The site is static, so there are no Functions, Workers, `wrangler.toml` or secrets. In the
-Cloudflare dashboard go to **Workers & Pages → Create → Pages → Connect to Git**, choose
-`miyunda/ReMode`, and use these settings:
+The site is deployed as an **assets-only Cloudflare Worker** (ADR-017). The root
+[`wrangler.jsonc`](wrangler.jsonc) declares only `assets` (`./apps/web/dist`, with
+`not_found_handling: "single-page-application"`). There is no `main` script, no bindings
+and no secrets. v1 has no server-side code; adding any later needs a new ADR (CLAUDE.md rule
+7). `wrangler` is a pinned root devDependency, so the build never downloads an unpinned
+copy.
 
-| Setting | Value |
+In the Cloudflare dashboard go to **Workers & Pages → Create → Workers → Import a
+repository**, choose `miyunda/ReMode`, and fill in:
+
+| Field | Value |
 |---|---|
-| Framework preset | `None` |
-| Build command | `pnpm build` |
-| Build output directory | `apps/web/dist` |
-| Root directory (advanced) | *(leave empty: the repository root)* |
-| Environment variable (Production and Preview) | `PNPM_VERSION` = `12.16.1` |
-| Node.js version | from the committed `.node-version` (`24`); no variable needed |
-| Production branch | `main` |
-| Preview branches (Settings → Builds → Branch control) | **All non-Production branches** |
-| Build system version | v3 (the default) |
+| Project name | `remode` (must equal `name` in `wrangler.jsonc`) |
+| Build command | `pnpm run build` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Preview command (non-production branches) | `pnpm exec wrangler preview` |
+| Enable Preview builds | On |
+| Protect with Cloudflare Access | Off (public site), unless you want previews private |
+| Root directory (advanced) | `/` (the repository root, where `wrangler.jsonc` is) |
+| Production branch (Settings → Build → Branch control) | `main` |
+| Build variables (Settings → Build → Build variables and secrets) | none required |
 
-Why the pnpm variable is needed: the v3 build image ships pnpm 10.11 and Node 22 by default.
-It reads the Node version from `.node-version` (or `NODE_VERSION`), but it does not read the
-`packageManager` field, the lockfile version or `engines` to choose pnpm. Only
-`PNPM_VERSION` does that. When `PNPM_VERSION` is changed, keep it equal to `packageManager`
-in `package.json`. Cloudflare runs `pnpm install` itself because `pnpm-lock.yaml` is at the root.
+How the build environment is chosen (Workers Builds docs):
 
-`apps/web/public/_headers` sets the CSP and the other security headers. `vite preview` sends
-the same headers, so the E2E suite runs under the production CSP. No `_redirects` file is
-needed: without a top-level `404.html`, Pages treats the project as a single-page app and
-serves `index.html` for unknown paths.
+- **Node.js** comes from the committed `.node-version` (`24`). The image default is also 24.
+- **pnpm** runs through Corepack and follows `packageManager` in `package.json`
+  (`pnpm@12.16.1`). That field takes precedence over a `PNPM_VERSION` build variable, so none
+  is needed. Bumping pnpm means changing `packageManager`, nothing else.
+- Dependencies are installed automatically with pnpm because `pnpm-lock.yaml` is at the root.
+- `wrangler deploy` / `wrangler preview` use the wrangler version from `package.json`.
+- Build variables are build-time only and invisible at runtime. Runtime variables and
+  secrets (Settings → Variables & Secrets) stay empty in v1.
+
+`apps/web/public/_headers` (CSP and the other security headers) is honoured by Workers
+static assets and is not itself served. `vite preview` sends the same headers, so the E2E
+suite runs under the production CSP. Unknown paths return `index.html` with 200.
+
+To check the deployment config locally without credentials (never deploy from a dev machine):
+
+```bash
+pnpm build
+pnpm exec wrangler deploy --dry-run   # reads wrangler.jsonc and the assets; uploads nothing
+pnpm exec wrangler dev                # serves apps/web/dist on workerd at http://localhost:8787
+E2E_BASE_URL=http://localhost:8787 pnpm --filter @remode/web exec playwright test --project=desktop
+```
 
 ## Supported input and limitations
 

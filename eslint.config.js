@@ -6,7 +6,9 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', 'corpus/**', 'fixtures/generated/**'] },
+  {
+    ignores: ['**/dist/**', '**/coverage/**', 'corpus/**', 'fixtures/generated/**', '.wrangler/**'],
+  },
   js.configs.recommended,
   ...tseslint.configs.strict,
   prettier,
