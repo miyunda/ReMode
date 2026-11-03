@@ -50,7 +50,7 @@ function expectRoundTrip(notes: readonly MelodyNote[], meta: MidiMetadata) {
 }
 
 const midiCases = manifest()
-  .filter((f) => f.file.endsWith('.mid') && f.expect.import.ok)
+  .filter((f) => f.file.endsWith('.mid') && f.expect.import?.ok)
   .flatMap(({ file }) => {
     const m = parse(fixtureBytes(file));
     return melodyCandidates(m)

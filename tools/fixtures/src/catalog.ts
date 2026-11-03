@@ -20,7 +20,8 @@ import {
 } from './smf.js';
 
 export interface FixtureExpectation {
-  import: {
+  /** MIDI fixtures only. */
+  import?: {
     ok: boolean;
     errorCode?: string;
     format?: 0 | 1;
@@ -42,8 +43,17 @@ export interface FixtureExpectation {
     /** OVERLAP issues the safe repair may fix. */
     repairable?: number;
   };
+  /** Jianpu fixtures only (`.jianpu`, UTF-8 text). */
+  jianpu?: {
+    noteCount: number;
+    /** Parser warning codes, exactly. */
+    warnings: string[];
+    /** MIDI fixture with the same melody: same notes, same analysis. */
+    twin?: string;
+  };
   analysis?: {
-    trackId: string;
+    /** MIDI fixtures: the track to analyse. */
+    trackId?: string;
     /** Expected rank-1 tonic and scale; omitted when the sample is meant to be unclear. */
     top?: { root: string; scaleId: string; name?: string; aliases?: string[] };
     /** Ambiguity codes that must be present. */
@@ -473,6 +483,59 @@ export function buildFixtures(): Fixture[] {
         ],
       ],
     }),
+  );
+
+  // --- Jianpu sources (spec §10.8, ADR-016) ------------------------------------
+  // Each has a MIDI twin above with exactly the same notes and meter, so
+  // analysis must agree whatever the input format.
+
+  const jianpu = (
+    file: string,
+    description: string,
+    text: string,
+    jianpuExpect: NonNullable<FixtureExpectation['jianpu']>,
+  ) => {
+    const twin = out.find((f) => f.file === jianpuExpect.twin);
+    const analysis = twin?.expect.analysis;
+    const expectation: FixtureExpectation = { jianpu: jianpuExpect };
+    if (analysis) {
+      expectation.analysis = { ...analysis };
+      delete expectation.analysis.trackId; // a jianpu source is a single melody
+    }
+    add(file, description, expectation, new TextEncoder().encode(text));
+  };
+
+  jianpu(
+    'mode-church-c-dorian.jianpu',
+    'C Dorian written 首调 (1=Bb, the tonic is 2), as in mode-church-c-dorian.mid.',
+    `// C Dorian: Bb 宫系统, tonic 2 (re).
+1=Bb 4/4 ♩=120
+| 2, 4, 6, 5, | 4, 3, 2, - |
+| 6, 7, 1 2 | 1 7, 6, 5, | 4, 3, 2, - |
+`,
+    { noteCount: 18, warnings: [], twin: 'mode-church-c-dorian.mid' },
+  );
+
+  jianpu(
+    'mode-pentatonic-c-gong-zhi.jianpu',
+    'G 徵调式 (C 宫系统，五声) ending on 5, as in mode-pentatonic-c-gong-zhi.mid.',
+    `// G 徵调式（C 宫系统，五声）
+1=C 4/4
+| 5, 6, 1 2 | 1 6, 5, - |
+| 1 2 3 5 | 3 2 1 6, | 5, - - - |
+`,
+    { noteCount: 16, warnings: [], twin: 'mode-pentatonic-c-gong-zhi.mid' },
+  );
+
+  jianpu(
+    'missing-degrees-cdega.jianpu',
+    'Only 1 2 3 5 6 in 1=C, as in missing-degrees-cdega.mid. The final bar is one beat long: a warning, not an error.',
+    `// C D E G A only: MISSING_DEGREES between C Ionian / Lydian / Mixolydian.
+1=C 4/4
+| 1 3 5 6 | 5 3 2 1 | - 3 5 6 |
+| 1' 6 5 3 | 2 1 - - | - |
+`,
+    { noteCount: 17, warnings: ['BAR_DURATION_MISMATCH'], twin: 'missing-degrees-cdega.mid' },
   );
 
   // --- Malformed / unsupported ---------------------------------------------------

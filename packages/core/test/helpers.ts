@@ -8,7 +8,7 @@ export interface ManifestEntry {
   file: string;
   description: string;
   expect: {
-    import: {
+    import?: {
       ok: boolean;
       errorCode?: string;
       format?: 0 | 1;
@@ -27,8 +27,9 @@ export interface ManifestEntry {
       codes: string[];
       repairable?: number;
     };
+    jianpu?: { noteCount: number; warnings: string[]; twin?: string };
     analysis?: {
-      trackId: string;
+      trackId?: string;
       top?: { root: string; scaleId: string; name?: string; aliases?: string[] };
       ambiguities: string[];
       absent?: string[];
