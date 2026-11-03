@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "test": "pnpm -r run test",
     "fixtures": "pnpm --filter @remode/fixtures run generate",
-    "smoke": "node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.mid --compact > /dev/null && node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.jianpu --compact > /dev/null && node tools/cli/dist/main.js export --jianpu fixtures/generated/mode-church-c-dorian.jianpu -o \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && node tools/cli/dist/main.js analyze \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && echo smoke ok"
+    "smoke": "node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.mid --compact > /dev/null && node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.jianpu --compact > /dev/null && node tools/cli/dist/main.js export fixtures/generated/mode-church-c-dorian.jianpu -o \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && node tools/cli/dist/main.js analyze \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && node tools/cli/dist/main.js export --jianpu '1=C 4/4 | 1 2 3 4 |' -o \"${TMPDIR:-/tmp}/remode-smoke-inline.mid\" --compact > /dev/null && echo smoke ok"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

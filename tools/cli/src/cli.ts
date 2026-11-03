@@ -24,7 +24,7 @@ import {
   type ValidationReport,
 } from '@remode/core';
 
-export const CLI_VERSION = '0.2.0';
+export const CLI_VERSION = '0.3.0';
 
 export const EXIT = {
   OK: 0,
@@ -36,25 +36,29 @@ export const EXIT = {
 } as const;
 
 export const USAGE = `Usage:
-  remode analyze <file.mid|file.jianpu|file.txt> [--track <id|index>] [--repair] [--compact]
+  remode analyze <file> [--track <id|index>] [--repair] [--compact]
   remode analyze --jianpu "<jianpu text>" [--compact]
-  remode export --jianpu <file.jianpu|file.txt> [-o <out.mid>] [--compact]
+  remode export <file.jianpu|file.txt> [-o <out.mid>] [--compact]
+  remode export --jianpu "<jianpu text>" [-o <out.mid>] [--compact]
+
+Input is either a positional file or inline --jianpu text, never both. A file's
+format follows its extension: .jianpu and .txt are UTF-8 jianpu text; anything
+else (.mid, .midi) is a Standard MIDI File.
 
 analyze prints a JSON report: parse info, track list, validation, mode
-candidates with tonic evidence, and ambiguity codes. .jianpu and .txt files are
-read as UTF-8 jianpu text; anything else as a Standard MIDI File.
+candidates with tonic evidence, and ambiguity codes.
 
 export converts jianpu to MIDI without any transform and prints a JSON report.
-Without -o the file is written to the current directory as
-<source>-original.mid.
+MIDI input is not accepted until transforms exist (M1b). Without -o the file is
+written to the current directory as <source>-original.mid (melody-original.mid
+for --jianpu text).
 
 Options:
   --track <id|index>  Track to analyse ("track-2" or 2). Required when the file
                       has more than one non-empty, non-percussion track.
   --repair            Apply the safe legato-tail repair and analyse the cleaned
                       source (every change is listed under "repair").
-  --jianpu <text>     analyze: jianpu text given inline.
-  --jianpu <file>     export: the jianpu file to convert.
+  --jianpu <text>     Jianpu text given inline (never a file path).
   -o, --output <file> export: output path.
   --compact           Single-line JSON.
   -h, --help          Show this help.
@@ -217,17 +221,9 @@ export function runCli(argv: readonly string[], io: CliIo): number {
   const print = (report: object) =>
     io.stdout(`${JSON.stringify(report, null, values.compact ? undefined : 2)}\n`);
 
-  if (command === 'export') {
-    if (values.jianpu === undefined || rest.length > 0) return usage();
-    if (values.track !== undefined || values.repair) {
-      return usage('export takes neither --track nor --repair.');
-    }
-    const bytes = read(values.jianpu);
-    if (!bytes) return EXIT.USAGE;
-    return runExport(values.jianpu, bytes, values.output, io, print);
-  }
-  if (command !== 'analyze') return usage();
+  if (command !== 'analyze' && command !== 'export') return usage();
 
+  // One input: a positional file (format by extension) or inline --jianpu text.
   let input: Report['input'];
   let bytes: Uint8Array;
   if (values.jianpu !== undefined) {
@@ -236,7 +232,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     input = { file: null, format: 'jianpu', bytes: bytes.length };
   } else {
     const [file, ...extra] = rest;
-    if (file === undefined || extra.length > 0) return usage();
+    if (file === undefined) return usage('Give an input file or --jianpu text.');
+    if (extra.length > 0) return usage();
     const fileBytes = read(file);
     if (!fileBytes) return EXIT.USAGE;
     bytes = fileBytes;
@@ -246,6 +243,20 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       bytes: bytes.length,
     };
   }
+
+  if (command === 'export') {
+    if (values.track !== undefined || values.repair) {
+      return usage('export takes neither --track nor --repair.');
+    }
+    if (input.format !== 'jianpu') {
+      return usage(
+        'export converts jianpu (.jianpu, .txt or --jianpu text) to MIDI; MIDI input has nothing to convert until transforms exist (M1b).',
+      );
+    }
+    return runExport({ ...input, format: 'jianpu' }, bytes, values.output, io, print);
+  }
+  if (values.output !== undefined) return usage('-o/--output applies to export only.');
+
   if (input.format === 'jianpu' && values.track !== undefined) {
     return usage('--track does not apply to jianpu input (it is a single melody).');
   }
@@ -327,7 +338,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
 
 interface ExportCliReport {
   remode: { cli: string; jianpuParserVersion: string };
-  input: { file: string; format: 'jianpu'; bytes: number };
+  input: { file: string | null; format: 'jianpu'; bytes: number };
   import: ReturnType<typeof jianpuSummary>;
   output: { file: string; bytes: number } | null;
   export: ExportReport | null;
@@ -335,16 +346,16 @@ interface ExportCliReport {
 }
 
 function runExport(
-  file: string,
+  input: ExportCliReport['input'],
   bytes: Uint8Array,
   output: string | undefined,
   io: CliIo,
   print: (report: object) => void,
 ): number {
-  const parsed = parseJianpu(utf8(bytes), { sourceFileName: basename(file) });
+  const parsed = parseJianpu(utf8(bytes), input.file ? { sourceFileName: input.file } : {});
   const report: ExportCliReport = {
     remode: { cli: CLI_VERSION, jianpuParserVersion: JIANPU_PARSER_VERSION },
-    input: { file: basename(file), format: 'jianpu', bytes: bytes.length },
+    input,
     import: jianpuSummary(parsed),
     output: null,
     export: null,
@@ -361,7 +372,7 @@ function runExport(
     print(report);
     return EXIT.EXPORT_FAILED;
   }
-  const target = output ?? exportFileName({ source: basename(file), variant: 'original' });
+  const target = output ?? exportFileName({ source: input.file ?? '', variant: 'original' });
   try {
     io.writeFile(target, result.bytes);
   } catch (e) {

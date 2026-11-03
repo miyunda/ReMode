@@ -21,7 +21,7 @@
 - `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke`：与 CI 相同的检查。
 - `pnpm fixtures`：重新生成 `fixtures/generated/`（修改 `tools/fixtures/src/catalog.ts` 后必须运行并提交，测试会比对字节）。
 - `node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track N] [--repair]`，或 `analyze --jianpu "<简谱>"`：JSON 分析报告。
-- `node tools/cli/dist/main.js export --jianpu <file.jianpu> [-o out.mid]`：简谱 → MIDI（不做任何变换）。
+- `node tools/cli/dist/main.js export <file.jianpu> [-o out.mid]`，或 `export --jianpu "<简谱>"`：简谱 → MIDI（不做任何变换）。两个子命令一致：位置参数是文件（按扩展名判断格式），`--jianpu` 永远是内联文本。
 - 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`；M1a：`m1a-implementation-notes.md`）。
 
 ### 分支与发布流程

@@ -48,11 +48,16 @@ a fresh generation.
 pnpm build
 node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track <id|index>] [--repair] [--compact]
 node tools/cli/dist/main.js analyze --jianpu "<jianpu text>" [--compact]
-node tools/cli/dist/main.js export --jianpu <file.jianpu|file.txt> [-o <out.mid>] [--compact]
+node tools/cli/dist/main.js export <file.jianpu|file.txt> [-o <out.mid>] [--compact]
+node tools/cli/dist/main.js export --jianpu "<jianpu text>" [-o <out.mid>] [--compact]
 ```
 
-`analyze` reads `.jianpu` and `.txt` files as UTF-8 jianpu text and anything else as a
-Standard MIDI File. It prints one JSON document with these sections:
+Both commands take their input the same way: either a positional file or inline jianpu text
+with `--jianpu "<text>"` (always text, never a path). Giving both, or neither, is a usage
+error. A file's format follows its extension: `.jianpu` and `.txt` are read as UTF-8 jianpu
+text, and anything else (`.mid`, `.midi`) as a Standard MIDI File.
+
+`analyze` prints one JSON document with these sections:
 
 - `input`: file name (`null` for `--jianpu` text), `format` (`midi` or `jianpu`) and size.
 - `import`: for MIDI, the format, PPQ, tempo map, time signatures, key signatures, import
@@ -78,9 +83,9 @@ ReMode never outputs a percentage or a confidence value.
 
 `export` converts jianpu to MIDI with no transform: the notes, tempo, time signature and the
 key signature implied by `1=X` (X major) are written as parsed. Without `-o` the file goes to
-the current directory as `<source>-original.mid`. The JSON report lists the output file and
-any export warnings. Note that `--jianpu` is inline text for `analyze` but a file path for
-`export`.
+the current directory as `<source>-original.mid` (`melody-original.mid` for `--jianpu` text).
+The JSON report lists the output file and any export warnings. MIDI input is rejected with a
+usage error (exit code 1) until transforms exist in M1b, because there is nothing to convert.
 
 | Exit code | Meaning |
 |---|---|

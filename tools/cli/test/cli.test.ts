@@ -100,8 +100,10 @@ describe('remode analyze', () => {
     expect(run('--help').stdout).toMatch(/remode analyze/);
     expect(run('analyze', 'x.mid', '--jianpu', '1 2 3').code).toBe(EXIT.USAGE);
     expect(run('analyze', '--jianpu', '1 2 3', '--track', '0').code).toBe(EXIT.USAGE);
-    expect(run('export', 'x.jianpu').code).toBe(EXIT.USAGE);
-    expect(run('export', '--jianpu', 'x.jianpu', '--repair').code).toBe(EXIT.USAGE);
+    expect(run('export').code).toBe(EXIT.USAGE);
+    expect(run('export', 'x.jianpu', '--jianpu', '1 2 3').code).toBe(EXIT.USAGE);
+    expect(run('export', '--jianpu', '1 2 3', '--repair').code).toBe(EXIT.USAGE);
+    expect(run('analyze', '--jianpu', '1 2 3', '-o', 'x.mid').code).toBe(EXIT.USAGE);
     expect(run('transpose', 'x.mid').code).toBe(EXIT.USAGE);
   });
 });
@@ -154,7 +156,7 @@ describe('remode analyze (jianpu)', () => {
 
 describe('remode export', () => {
   it('converts jianpu to MIDI without changing a note', () => {
-    const r = run('export', '--jianpu', 'mode-church-c-dorian.jianpu', '-o', 'out.mid');
+    const r = run('export', 'mode-church-c-dorian.jianpu', '-o', 'out.mid');
     expect(r.code).toBe(EXIT.OK);
     expect(r.json.output).toEqual({ file: 'out.mid', bytes: r.written.get('out.mid')!.length });
     expect(r.json.export.warnings).toEqual([]);
@@ -173,14 +175,37 @@ describe('remode export', () => {
   });
 
   it('names the output after the source when -o is omitted', () => {
-    const r = run('export', '--jianpu', 'mode-pentatonic-c-gong-zhi.jianpu');
+    const r = run('export', 'mode-pentatonic-c-gong-zhi.jianpu');
     expect(r.code).toBe(EXIT.OK);
     expect([...r.written.keys()]).toEqual(['mode-pentatonic-c-gong-zhi-original.mid']);
   });
 
+  it('converts inline --jianpu text, which is never read as a path', () => {
+    const r = run('export', '--jianpu', '1=C 4/4 | 1 2 3 4 |', '-o', 'out.mid');
+    expect(r.code).toBe(EXIT.OK);
+    expect(r.json.input).toEqual({ file: null, format: 'jianpu', bytes: 19 });
+    const back = importMidi(r.written.get('out.mid')!);
+    expect(back.ok && back.midi.tracks[0]!.notes.map((n) => n.pitch)).toEqual([60, 62, 64, 65]);
+
+    const unnamed = run('export', '--jianpu', '1 2 3');
+    expect([...unnamed.written.keys()]).toEqual(['melody-original.mid']);
+
+    // A path given to --jianpu is parsed as text and fails, rather than being read.
+    const path = run('export', '--jianpu', 'mode-church-c-dorian.jianpu');
+    expect(path.code).toBe(EXIT.IMPORT_FAILED);
+    expect(path.written.size).toBe(0);
+  });
+
+  it('refuses MIDI input with a clear message', () => {
+    const r = run('export', 'mode-church-c-dorian.mid', '-o', 'out.mid');
+    expect(r.code).toBe(EXIT.USAGE);
+    expect(r.stderr).toMatch(/MIDI input has nothing to convert/);
+    expect(r.written.size).toBe(0);
+  });
+
   it('writes nothing when the jianpu does not parse', () => {
     virtual.set('/virtual/bad.jianpu', new TextEncoder().encode('1=C |: 1 2 :|'));
-    const r = run('export', '--jianpu', '/virtual/bad.jianpu', '-o', 'out.mid');
+    const r = run('export', '/virtual/bad.jianpu', '-o', 'out.mid');
     expect(r.code).toBe(EXIT.IMPORT_FAILED);
     expect(r.json.errors[0].code).toBe('UNSUPPORTED_REPEAT');
     expect(r.written.size).toBe(0);

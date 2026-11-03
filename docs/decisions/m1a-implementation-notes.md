@@ -1,6 +1,6 @@
 # M1a 实现记录与规格偏差
 
-状态：随 `feat/m1a-jianpu-export` 引入。简谱解析器 `remode-jianpu/1.0.0`，CLI 0.2.0；`analysisVersion` 不变（`remode-mode-2step/0.2.0`）。
+状态：随 `feat/m1a-jianpu-export` 引入。简谱解析器 `remode-jianpu/1.0.0`，CLI 0.3.0；`analysisVersion` 不变（`remode-mode-2step/0.2.0`）。
 M1a 只做输入/输出：简谱解析、MIDI 导出、round-trip、CLI。没有任何音高变换（M1b）。
 本文件记录对规格（`docs/ReMode-Development-Plan.md` §10.8、§11、§12.3）的具体化与偏差（CLAUDE.md 规则 10）。
 
@@ -51,7 +51,8 @@ M1a 只做输入/输出：简谱解析、MIDI 导出、round-trip、CLI。没有
 
 ## 5. CLI
 
-- `analyze` 按扩展名判断输入：`.jianpu`、`.txt` 按 UTF-8 简谱解析，其他按 MIDI；`--jianpu "<text>"` 直接给文本。报告的 `input.format` 与 `import.source` 标明来源；简谱输入的 `selectedTrack` 为 `"jianpu"`，`--track` 不适用（用法错误）。解析失败退出码 3，`errors` 中每条带行列号。
-- `export --jianpu <file> [-o out.mid]`：只做简谱 → MIDI，保留来源调号（`1=X` → X 大调）。不给 `-o` 时按 `exportFileName` 写到当前目录（`<source>-original.mid`）。编码失败退出码 5。
-- 注意 `--jianpu` 在两个子命令中的含义不同：`analyze` 中是文本，`export` 中是文件路径（按任务要求）。
+- 两个子命令的输入方式相同（CLI 0.3.0 统一）：位置参数是文件，按扩展名判断格式（`.jianpu`、`.txt` 按 UTF-8 简谱解析，其他按 MIDI）；`--jianpu "<text>"` 永远是内联文本，不当作路径。两者同时给出或都不给是用法错误。
+- `analyze`：报告的 `input.format` 与 `import.source` 标明来源；简谱输入的 `selectedTrack` 为 `"jianpu"`，`--track` 不适用（用法错误）。解析失败退出码 3，`errors` 中每条带行列号。
+- `export <file.jianpu> [-o out.mid]` 或 `export --jianpu "<text>"`：只做简谱 → MIDI，保留来源调号（`1=X` → X 大调）。不给 `-o` 时按 `exportFileName` 写到当前目录（`<source>-original.mid`，内联文本为 `melody-original.mid`）。MIDI 输入在 M1b 有变换之前没有可转换的内容，给出明确提示并以用法错误（退出码 1）拒绝。编码失败退出码 5。
+- 0.2.0 中 `export --jianpu` 曾表示文件路径，与 `analyze` 不一致；0.3.0 起统一。
 - `pnpm smoke` 增加了：分析简谱 fixture、导出为 MIDI、再分析导出的文件。
