@@ -13,6 +13,10 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    files: ['**/test/**/*.ts'],
+    rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
+  {
     // Core must run unchanged in Node, the browser and a Web Worker:
     // no DOM, no React, no audio stack, no Node built-ins, no Cloudflare APIs.
     files: ['packages/core/src/**/*.ts'],

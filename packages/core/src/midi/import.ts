@@ -1,7 +1,11 @@
 // MIDI import (spec §5.1) on top of @tonejs/midi. Bytes in, plain data out:
 // no File/Blob/DOM APIs, so the same code runs in Node, the browser and a Worker.
 
-import { Midi } from '@tonejs/midi';
+// @tonejs/midi ships CommonJS/UMD only: Node's ESM loader cannot see its named
+// exports, so take the namespace object as the default import.
+import tonejsMidi from '@tonejs/midi';
+const { Midi } = tonejsMidi;
+
 import type {
   KeySignatureEvent,
   MelodyNote,
@@ -85,8 +89,7 @@ const fail = (code: ImportErrorCode, message: string): ImportResult => ({
   error: { code, message },
 });
 
-const ascii = (bytes: Uint8Array, at: number) =>
-  String.fromCharCode(...bytes.subarray(at, at + 4));
+const ascii = (bytes: Uint8Array, at: number) => String.fromCharCode(...bytes.subarray(at, at + 4));
 const u16 = (b: Uint8Array, at: number) => ((b[at] as number) << 8) | (b[at + 1] as number);
 const u32 = (b: Uint8Array, at: number) =>
   (((b[at] as number) << 24) >>> 0) +
@@ -167,7 +170,7 @@ export function importMidi(
   const pre = precheck(bytes, limits);
   if (isError(pre)) return { ok: false, error: pre };
 
-  let midi: Midi;
+  let midi: InstanceType<typeof Midi>;
   try {
     midi = new Midi(bytes);
   } catch (e) {
@@ -201,13 +204,11 @@ export function importMidi(
     });
   }
 
-  const rawSignatures = midi.header.timeSignatures.map(
-    (t): TimeSignatureEvent => ({
-      tick: t.ticks,
-      numerator: t.timeSignature[0] as number,
-      denominator: t.timeSignature[1] as number,
-    }),
-  );
+  const rawSignatures = midi.header.timeSignatures.map((t): TimeSignatureEvent => ({
+    tick: t.ticks,
+    numerator: t.timeSignature[0] as number,
+    denominator: t.timeSignature[1] as number,
+  }));
   const timeSignatures = dedupe(
     rawSignatures.filter((t) => {
       const valid =
@@ -233,9 +234,11 @@ export function importMidi(
       message: 'No time signature at tick 0; assuming 4/4 (the MIDI default).',
     });
   }
-  const keySignatures = midi.header.keySignatures.map(
-    (k): KeySignatureEvent => ({ tick: k.ticks, key: k.key, scale: k.scale as 'major' | 'minor' }),
-  );
+  const keySignatures = midi.header.keySignatures.map((k): KeySignatureEvent => ({
+    tick: k.ticks,
+    key: k.key,
+    scale: k.scale as 'major' | 'minor',
+  }));
 
   const tracks = midi.tracks.map((t, index): ImportedTrack => {
     const id = `track-${index}`;

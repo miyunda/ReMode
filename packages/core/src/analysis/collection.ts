@@ -14,8 +14,7 @@ import {
 import type { ChineseScaleType } from '../types.js';
 
 type Interpretation =
-  | { kind: 'church' }
-  | { kind: 'chinese'; scaleType: ChineseScaleType; gongOffset: number };
+  { kind: 'church' } | { kind: 'chinese'; scaleType: ChineseScaleType; gongOffset: number };
 
 interface CollectionType {
   id: CollectionId;

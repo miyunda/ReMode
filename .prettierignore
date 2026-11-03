@@ -4,3 +4,4 @@ coverage/
 fixtures/generated/
 docs/
 corpus/
+*.md

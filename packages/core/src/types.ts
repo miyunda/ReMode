@@ -81,12 +81,7 @@ export interface MelodyProject {
 export type ChineseTonicDegree = 'gong' | 'shang' | 'jue' | 'zhi' | 'yu';
 
 export type ChineseScaleType =
-  | 'pentatonic'
-  | 'hexa-qingjiao'
-  | 'hexa-biangong'
-  | 'qingyue'
-  | 'yayue'
-  | 'yanyue';
+  'pentatonic' | 'hexa-qingjiao' | 'hexa-biangong' | 'qingyue' | 'yayue' | 'yanyue';
 
 export interface ChineseModeRef {
   /** Pitch class of 宫. */
@@ -133,12 +128,7 @@ export interface CollectionMatch {
 }
 
 export type TonicEvidenceKind =
-  | 'FINAL_NOTE'
-  | 'PHRASE_END'
-  | 'LONG_NOTE'
-  | 'STRONG_BEAT'
-  | 'AMBITUS'
-  | 'FIRST_NOTE';
+  'FINAL_NOTE' | 'PHRASE_END' | 'LONG_NOTE' | 'STRONG_BEAT' | 'AMBITUS' | 'FIRST_NOTE';
 
 export interface TonicEvidence {
   kind: TonicEvidenceKind;
@@ -178,11 +168,7 @@ export interface ModeCandidate {
 }
 
 export type AmbiguityCode =
-  | 'MISSING_DEGREES'
-  | 'MULTIPLE_COLLECTIONS'
-  | 'TONIC_UNCLEAR'
-  | 'CHROMATIC_HEAVY'
-  | 'TOO_SHORT';
+  'MISSING_DEGREES' | 'MULTIPLE_COLLECTIONS' | 'TONIC_UNCLEAR' | 'CHROMATIC_HEAVY' | 'TOO_SHORT';
 
 export interface Ambiguity {
   code: AmbiguityCode;

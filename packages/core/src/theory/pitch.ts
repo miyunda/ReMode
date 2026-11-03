@@ -3,7 +3,8 @@ export const mod = (n: number, m: number): number => ((n % m) + m) % m;
 
 export const pitchClass = (pitch: number): number => mod(pitch, 12);
 
-const PC_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const;
+/** Key-signature-style spelling (Db, Eb, F#, Ab, Bb); enharmonic context comes later. */
+const PC_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const;
 
 export const pitchClassName = (pc: number): string => PC_NAMES[mod(pc, 12)] as string;
 

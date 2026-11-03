@@ -81,10 +81,18 @@ const end = (n: MelodyNote) => n.startTick + n.durationTick;
 function noteValidity(n: MelodyNote): ValidationIssue | null {
   const base = { severity: 'error' as const, noteIds: [n.id] };
   if (!isValidMidiPitch(n.pitch)) {
-    return { ...base, code: 'INVALID_PITCH', message: `Note ${n.id}: pitch ${n.pitch} is not an integer in 0..127.` };
+    return {
+      ...base,
+      code: 'INVALID_PITCH',
+      message: `Note ${n.id}: pitch ${n.pitch} is not an integer in 0..127.`,
+    };
   }
   if (!Number.isInteger(n.startTick) || n.startTick < 0) {
-    return { ...base, code: 'INVALID_START', message: `Note ${n.id}: start tick ${n.startTick} is invalid.` };
+    return {
+      ...base,
+      code: 'INVALID_START',
+      message: `Note ${n.id}: start tick ${n.startTick} is invalid.`,
+    };
   }
   if (!Number.isInteger(n.durationTick) || n.durationTick <= 0) {
     return {
@@ -96,7 +104,11 @@ function noteValidity(n: MelodyNote): ValidationIssue | null {
     };
   }
   if (!Number.isFinite(n.velocity) || n.velocity < 0 || n.velocity > 1) {
-    return { ...base, code: 'INVALID_VELOCITY', message: `Note ${n.id}: velocity ${n.velocity} is outside 0..1.` };
+    return {
+      ...base,
+      code: 'INVALID_VELOCITY',
+      message: `Note ${n.id}: velocity ${n.velocity} is outside 0..1.`,
+    };
   }
   return null;
 }
@@ -123,11 +135,12 @@ export function validateMelody(
 
   let holder: MelodyNote | undefined; // note with the greatest end tick so far
   let prev: MelodyNote | undefined;
-  for (let i = 0; i < valid.length; ) {
+  for (let i = 0; i < valid.length;) {
     // Group simultaneous onsets.
     const group: MelodyNote[] = [];
     const tick = (valid[i] as MelodyNote).startTick;
-    while (i < valid.length && (valid[i] as MelodyNote).startTick === tick) group.push(valid[i++] as MelodyNote);
+    while (i < valid.length && (valid[i] as MelodyNote).startTick === tick)
+      group.push(valid[i++] as MelodyNote);
 
     if (group.length > 1) {
       const pitches = group.map((n) => n.pitch);
@@ -142,7 +155,8 @@ export function validateMelody(
           distinct === 1
             ? `Tick ${tick}: ${group.length} identical ${pitchName(pitches[0] as number)} notes start together.`
             : `Tick ${tick}: ${pitches.map(pitchName).join(', ')} start together (chord).`,
-        suggestion: 'Keep one note per onset in the source (trimming cannot make a chord monophonic).',
+        suggestion:
+          'Keep one note per onset in the source (trimming cannot make a chord monophonic).',
       });
     }
 
@@ -179,7 +193,12 @@ export function validateMelody(
   const monophonic = !issues.some((x) =>
     ['OVERLAP', 'SAME_TICK_CHORD', 'DUPLICATE_NOTE'].includes(x.code),
   );
-  return { ok: !issues.some((x) => x.severity === 'error'), monophonic, noteCount: notes.length, issues };
+  return {
+    ok: !issues.some((x) => x.severity === 'error'),
+    monophonic,
+    noteCount: notes.length,
+    issues,
+  };
 }
 
 /** Track-level checks (empty, percussion, pitch bend, CC64) plus `validateMelody`. */
@@ -191,7 +210,12 @@ export function validateTrack(
   const report = validateMelody(track.notes, meta, options);
   const extra: ValidationIssue[] = [];
   if (track.noteCount === 0) {
-    extra.push({ code: 'EMPTY_TRACK', severity: 'error', noteIds: [], message: `${track.id} has no notes.` });
+    extra.push({
+      code: 'EMPTY_TRACK',
+      severity: 'error',
+      noteIds: [],
+      message: `${track.id} has no notes.`,
+    });
   }
   if (track.isPercussion) {
     extra.push({
@@ -214,7 +238,8 @@ export function validateTrack(
       code: 'SUSTAIN_PEDAL_PRESENT',
       severity: 'warning',
       noteIds: [],
-      message: 'Track uses the sustain pedal (CC64); it may sound polyphonic even without note overlaps.',
+      message:
+        'Track uses the sustain pedal (CC64); it may sound polyphonic even without note overlaps.',
     });
   }
   const issues = [...extra, ...report.issues];

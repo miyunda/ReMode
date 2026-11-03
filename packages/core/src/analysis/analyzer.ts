@@ -71,7 +71,9 @@ export function resolveConfig(override: AnalyzeOptions['config']): AnalysisConfi
   };
 }
 
-export function collectionLabel(m: Pick<CollectionMatch, 'collectionId' | 'transposition'>): string {
+export function collectionLabel(
+  m: Pick<CollectionMatch, 'collectionId' | 'transposition'>,
+): string {
   const t = pitchClassName(m.transposition);
   switch (m.collectionId) {
     case 'pentatonic':
@@ -266,7 +268,9 @@ function findAmbiguities(
       }
       if (lacksFinal) {
         const finalPc = pitchClass((sorted[sorted.length - 1] as MelodyNote).pitch);
-        reasons.push(`尾音 ${pitchClassName(finalPc)} 不支持首选主音 ${pitchClassName(best.rootPitchClass)}`);
+        reasons.push(
+          `尾音 ${pitchClassName(finalPc)} 不支持首选主音 ${pitchClassName(best.rootPitchClass)}`,
+        );
       }
       out.push({
         code: 'TONIC_UNCLEAR',

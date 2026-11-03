@@ -20,7 +20,8 @@ const rotate = (set: readonly number[], offset: number): number[] =>
 function heptatonicIdentity(intervals: readonly number[]): DegreeIdentity[] {
   return intervals.map((interval, i) => {
     const alter = interval - (MAJOR[i] as number);
-    if (alter < -1 || alter > 1) throw new Error(`Unsupported alteration ${alter} at degree ${i + 1}`);
+    if (alter < -1 || alter > 1)
+      throw new Error(`Unsupported alteration ${alter} at degree ${i + 1}`);
     return { degree: (i + 1) as DegreeIdentity['degree'], alter: alter as DegreeIdentity['alter'] };
   });
 }
@@ -82,58 +83,59 @@ export const CHINESE_TONIC_DEGREES: readonly ChineseTonicDegree[] = [
 export const PIANYIN_ROLES = ['qingjiao', 'bianzhi', 'biangong', 'run'] as const;
 
 /** Tones of each scale type relative to 宫, with their role names. */
-const CHINESE_TONES: Readonly<Record<ChineseScaleType, ReadonlyArray<readonly [number, string]>>> = {
-  pentatonic: [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [7, 'zhi'],
-    [9, 'yu'],
-  ],
-  'hexa-qingjiao': [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [5, 'qingjiao'],
-    [7, 'zhi'],
-    [9, 'yu'],
-  ],
-  'hexa-biangong': [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [7, 'zhi'],
-    [9, 'yu'],
-    [11, 'biangong'],
-  ],
-  qingyue: [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [5, 'qingjiao'],
-    [7, 'zhi'],
-    [9, 'yu'],
-    [11, 'biangong'],
-  ],
-  yayue: [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [6, 'bianzhi'],
-    [7, 'zhi'],
-    [9, 'yu'],
-    [11, 'biangong'],
-  ],
-  yanyue: [
-    [0, 'gong'],
-    [2, 'shang'],
-    [4, 'jue'],
-    [5, 'qingjiao'],
-    [7, 'zhi'],
-    [9, 'yu'],
-    [10, 'run'],
-  ],
-};
+const CHINESE_TONES: Readonly<Record<ChineseScaleType, ReadonlyArray<readonly [number, string]>>> =
+  {
+    pentatonic: [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [7, 'zhi'],
+      [9, 'yu'],
+    ],
+    'hexa-qingjiao': [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [5, 'qingjiao'],
+      [7, 'zhi'],
+      [9, 'yu'],
+    ],
+    'hexa-biangong': [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [7, 'zhi'],
+      [9, 'yu'],
+      [11, 'biangong'],
+    ],
+    qingyue: [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [5, 'qingjiao'],
+      [7, 'zhi'],
+      [9, 'yu'],
+      [11, 'biangong'],
+    ],
+    yayue: [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [6, 'bianzhi'],
+      [7, 'zhi'],
+      [9, 'yu'],
+      [11, 'biangong'],
+    ],
+    yanyue: [
+      [0, 'gong'],
+      [2, 'shang'],
+      [4, 'jue'],
+      [5, 'qingjiao'],
+      [7, 'zhi'],
+      [9, 'yu'],
+      [10, 'run'],
+    ],
+  };
 
 export const CHINESE_SCALE_TYPES = Object.keys(CHINESE_TONES) as ChineseScaleType[];
 
@@ -217,7 +219,10 @@ export function gongPitchClassOf(scale: ScaleDefinition, rootPitchClass: number)
   return mod(rootPitchClass - ZHENGYIN[scale.chinese.tonicDegree], 12);
 }
 
-export function chineseModeRef(scale: ScaleDefinition, rootPitchClass: number): ChineseModeRef | null {
+export function chineseModeRef(
+  scale: ScaleDefinition,
+  rootPitchClass: number,
+): ChineseModeRef | null {
   const gong = gongPitchClassOf(scale, rootPitchClass);
   if (gong === null || !scale.chinese) return null;
   return { gongPitchClass: gong, ...scale.chinese };
