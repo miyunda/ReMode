@@ -10,18 +10,18 @@ runs in the browser. There is no backend and no AI.
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M0 (Core + CLI).** M0 covers MIDI import, monophony validation and
-mode analysis, all from the command line. Transforms, MIDI export, jianpu input and the web
-UI come in M1–M2.
+**Status: milestone M1a (input/output).** M0 added MIDI import, monophony validation and
+mode analysis. M1a adds jianpu (numbered notation) input and MIDI export, all from the
+command line. Mode transforms come in M1b and the web UI in M2.
 
 ## Repository layout
 
 | Path | What |
 |---|---|
-| `packages/core` | `@remode/core`: pure TypeScript engine (types, scales, MIDI import, validator, analyzer). No DOM, no Node built-ins. |
+| `packages/core` | `@remode/core`: pure TypeScript engine (types, scales, MIDI import/export, jianpu parser, validator, analyzer). No DOM, no Node built-ins. |
 | `tools/cli` | `@remode/cli`: the `remode` command. |
-| `tools/fixtures` | Deterministic MIDI fixture generator, which writes to `fixtures/generated/`. |
-| `fixtures/generated` | Committed fixtures and `manifest.json` (description and expected behaviour of each fixture). |
+| `tools/fixtures` | Deterministic fixture generator (MIDI and jianpu text), which writes to `fixtures/generated/`. |
+| `fixtures/generated` | Committed `.mid` and `.jianpu` fixtures and `manifest.json` (description and expected behaviour of each fixture). |
 | `apps/web` | Placeholder for the M2 browser workbench. |
 
 ## Setup
@@ -46,17 +46,24 @@ a fresh generation.
 
 ```bash
 pnpm build
-node tools/cli/dist/main.js analyze <file.mid> [--track <id|index>] [--repair] [--compact]
+node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track <id|index>] [--repair] [--compact]
+node tools/cli/dist/main.js analyze --jianpu "<jianpu text>" [--compact]
+node tools/cli/dist/main.js export --jianpu <file.jianpu|file.txt> [-o <out.mid>] [--compact]
 ```
 
-`analyze` prints one JSON document with these sections:
+`analyze` reads `.jianpu` and `.txt` files as UTF-8 jianpu text and anything else as a
+Standard MIDI File. It prints one JSON document with these sections:
 
-- `import`: format, PPQ, tempo map, time signatures, key signatures, import warnings, and
-  every track (channel, program, note count, pitch range, percussion flag, pitch-bend and
-  CC64 flags, and whether it is a melody candidate).
+- `input`: file name (`null` for `--jianpu` text), `format` (`midi` or `jianpu`) and size.
+- `import`: for MIDI, the format, PPQ, tempo map, time signatures, key signatures, import
+  warnings, and every track (channel, program, note count, pitch range, percussion flag,
+  pitch-bend and CC64 flags, and whether it is a melody candidate). For jianpu, the parser
+  version, the header (key, reference pitch, time signature, BPM), the bars, and warnings
+  such as `BAR_DURATION_MISMATCH`; on failure, `errors` with `code`, `line` and `column`.
 - `selectedTrack` and `validation`: monophony report with structured issues (`EMPTY_TRACK`,
   `PERCUSSION_TRACK`, `SAME_TICK_CHORD`, `DUPLICATE_NOTE`, `OVERLAP` with
-  ticks/ms/repairable, `INVALID_*`, `PITCH_BEND_PRESENT`, `SUSTAIN_PEDAL_PRESENT`).
+  ticks/ms/repairable, `INVALID_*`, `PITCH_BEND_PRESENT`, `SUSTAIN_PEDAL_PRESENT`). Jianpu
+  input is a single melody, so `selectedTrack` is `"jianpu"`.
 - `repair`: present only with `--repair`. It lists every trimmed legato tail. The source
   notes are never modified; the analysis runs on the cleaned copy.
 - `analysis`: `analysisVersion` and the full `config`, the PCD, compatible and selected
@@ -69,13 +76,20 @@ node tools/cli/dist/main.js analyze <file.mid> [--track <id|index>] [--repair] [
 
 ReMode never outputs a percentage or a confidence value.
 
+`export` converts jianpu to MIDI with no transform: the notes, tempo, time signature and the
+key signature implied by `1=X` (X major) are written as parsed. Without `-o` the file goes to
+the current directory as `<source>-original.mid`. The JSON report lists the output file and
+any export warnings. Note that `--jianpu` is inline text for `analyze` but a file path for
+`export`.
+
 | Exit code | Meaning |
 |---|---|
-| 0 | Analysed |
+| 0 | Done |
 | 1 | Usage or I/O error |
 | 2 | Track selection needed (`TRACK_SELECTION_REQUIRED`, `NO_MELODIC_TRACK`, `TRACK_NOT_FOUND`) |
-| 3 | The file could not be imported (`NOT_MIDI`, `TRUNCATED`, `PARSE_FAILED`, …) |
+| 3 | The input could not be imported or parsed (`NOT_MIDI`, `TRUNCATED`, `UNSUPPORTED_TUPLET`, …) |
 | 4 | The selected track is not a usable monophonic melody (see `validation`) |
+| 5 | The MIDI file could not be encoded (`export`) |
 
 Example:
 
@@ -86,8 +100,38 @@ node tools/cli/dist/main.js analyze fixtures/generated/missing-degrees-cdega.mid
 The top candidate is `C 宫调式（C 宫系统，五声）`, with evidence such as `FINAL_NOTE` (尾音为 C)
 and `PHRASE_END` (1 个非末句中 1 个结束于 C). The analysis also reports `MISSING_DEGREES`:
 “旋律未确立第 4、7 级，无法区分 C Ionian / C Mixolydian / C Lydian；同样无法区分的中国七声读法：…”, listing the 清乐/雅乐/燕乐 readings as well.
+Analysing `fixtures/generated/missing-degrees-cdega.jianpu`, the same melody in jianpu, gives
+the same analysis.
 
-## Supported input and limitations (M0)
+## Jianpu
+
+```text
+// C Dorian, written 首调: 宫 = Bb, so the tonic is 2.
+1=Bb 4/4 ♩=120
+| 2, 4, 6, 5, | 4, 3, 2, - |
+| 6, 7, 1 2 | 1 7, 6, 5, | 4, 3, 2, - |
+```
+
+| Syntax | Meaning |
+|---|---|
+| `1=C`, `1=F#`, `1=Bb` | Key: the pitch of `1`. An unmarked `1` is in octave 4 (`1=C` → C4 = MIDI 60, `1=G` → G4). Default `1=C`, with a warning. |
+| `4/4`, `6/8` | Time signature. Default 4/4, with a warning. |
+| `bpm=96` or `♩=96` | Tempo. Default 120. |
+| `1`–`7`, `0` | Scale degrees of the major scale on the key; `0` is a rest. A bare digit is a quarter note. |
+| `#4`, `b7` | Sharp / flat prefix. |
+| `1'`, `1''`, `5,`, `5,,` | Octave up / down, stackable. |
+| `5_`, `5__` | Eighth / sixteenth. |
+| `6.`, `6_.` | Dot: adds half the note's value. |
+| `-` | Adds one beat (a quarter note) to the previous note or rest, even across a barline. |
+| `\|` | Barline. A bar whose length does not match the time signature is a warning, not an error. |
+| `// …` | Comment to the end of the line. |
+
+Headers must come before the first note. Tuplets, slurs, ornaments, repeats, double
+accidentals, double dots, thirty-seconds and mid-piece key, tempo or time changes are
+rejected with a structured error (`code`, `line`, `column`). Every note gets velocity 96/127
+and a stable ID `jianpu:n<k>`. The full rules are in spec §10.8.1.
+
+## Supported input and limitations
 
 Supported: Standard MIDI Files of format 0 and 1 that use ticks-per-quarter-note timing.
 Multi-track files are supported; Type 0 files are split into one track per channel.
@@ -110,8 +154,28 @@ Not supported:
 - Strong-beat evidence assumes there is no anacrusis (pickup).
 - Evidence points are initial, uncalibrated values (calibration is planned for M4).
 
+### MIDI export and round-trip support matrix
+
+The exporter writes a format 1 file: a conductor track and one melody track. The round-trip
+tests (import or parse → export → re-import, Invariant E) cover every generated MIDI fixture
+that passes validation and every jianpu fixture.
+
+| Data | Round-trip | Notes |
+|---|---|---|
+| Note count, pitch, start tick, duration | Exact | Ticks are never re-derived from seconds. |
+| Velocity | Exact for 7-bit values (k/127) | Other values are rounded (`VELOCITY_QUANTIZED`); 0 is written as 1/127 (`VELOCITY_ZERO_RAISED`), because a note-on with velocity 0 is a note-off. |
+| PPQ | Exact | |
+| Tempo map | Exact to the microsecond per quarter note | MIDI stores whole microseconds; other tempos (e.g. jianpu `bpm=70`) are rounded (`TEMPO_ROUNDED`). |
+| Time signatures | Exact (numerator, denominator, tick) | The MIDI clocks-per-click and 32nds fields are always written as 24 and 8. |
+| Key signatures | Exact for −7…+7 accidentals, major or minor | Unencodable entries are dropped (`KEY_SIGNATURE_DROPPED`). With a target mode, the collection's key signature is written and the mode goes in a text event (spec §11.1). |
+| Channel, program, track name | Exact | Track names are written as UTF-8. |
+| Pitch bend, CC64 and other controllers | Not exported | Reported as `PITCH_BEND_DROPPED` / `SUSTAIN_PEDAL_DROPPED` when the caller passes the source flags. |
+| Other tracks, SysEx, lyrics, markers, other meta events | Not exported | Only the selected melody is written; `TRACKS_DROPPED` when the caller says so. |
+| Format 0 source | Written as format 1 | Re-import yields the same melody track. |
+
 The decisions behind these behaviours are in
-[`docs/decisions/m0-implementation-notes.md`](docs/decisions/m0-implementation-notes.md).
+[`docs/decisions/m0-implementation-notes.md`](docs/decisions/m0-implementation-notes.md) and
+[`docs/decisions/m1a-implementation-notes.md`](docs/decisions/m1a-implementation-notes.md).
 
 ## Corpus
 

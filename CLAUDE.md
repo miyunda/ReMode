@@ -20,15 +20,16 @@
 
 - `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke`：与 CI 相同的检查。
 - `pnpm fixtures`：重新生成 `fixtures/generated/`（修改 `tools/fixtures/src/catalog.ts` 后必须运行并提交，测试会比对字节）。
-- `node tools/cli/dist/main.js analyze <file.mid> [--track N] [--repair]`：JSON 分析报告。
-- 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`）。
+- `node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track N] [--repair]`，或 `analyze --jianpu "<简谱>"`：JSON 分析报告。
+- `node tools/cli/dist/main.js export --jianpu <file.jianpu> [-o out.mid]`：简谱 → MIDI（不做任何变换）。
+- 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`；M1a：`m1a-implementation-notes.md`）。
 
 ### 分支与发布流程
 
-- **不直接提交到 `main`**。`main` 是 Cloudflare 生产分支，只通过 GitHub PR 合并更新。
-- 开发在非 `main` 分支进行（`dev` 或按切片命名的 `feat/...`），推送后由 Cloudflare 自动生成预览部署。
+- **不直接提交到 `main`**。`main` 是 Cloudflare 生产分支，受分支保护（含管理员）：只能通过 GitHub PR 合并更新。
+- 每个切片从最新的 `main` 拉出功能分支，命名为 `feat/...`（如 `feat/m1a-jianpu-export`）；没有长期的 `dev` 分支。推送后由 Cloudflare 自动生成预览部署。
 - 预览站验收通过后，在 GitHub 上开 PR 合并到 `main`，合并后自动发布生产。
-- CI（typecheck / lint / test / build）必须在 PR 上全绿才能合并。
+- CI 的 `check` 任务（typecheck / lint / test / build / smoke）必须在 PR 上全绿才能合并。
 
 ### 建议的首个 Agent 任务
 
