@@ -3,6 +3,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   { ignores: ['**/dist/**', '**/coverage/**', 'corpus/**', 'fixtures/generated/**'] },
@@ -13,7 +14,17 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ['**/test/**/*.ts'],
+    // Browser workbench: React hooks rules and browser globals.
+    files: ['apps/web/**/*.{ts,tsx,js}'],
+    languageOptions: { globals: { ...globals.browser } },
+  },
+  {
+    // Not e2e/: Playwright fixtures take a `use` callback that is not a React hook.
+    files: ['apps/web/src/**/*.{ts,tsx}', 'apps/web/test/**/*.{ts,tsx}'],
+    ...reactHooks.configs.flat.recommended,
+  },
+  {
+    files: ['**/test/**/*.{ts,tsx}', 'apps/web/e2e/**/*.ts'],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
   {

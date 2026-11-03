@@ -1,0 +1,171 @@
+@import 'tailwindcss';
+
+/*
+ * Colour tokens: Rosé Pine Dawn (light, default) and Rosé Pine (dark).
+ * https://rosepinetheme.com/palette — palette values unchanged except
+ * `--rp-muted-text`, a darker/lighter step of `subtle` so small secondary
+ * text meets WCAG AA (4.5:1) on every surface; see test/contrast.test.ts.
+ * The theme follows prefers-color-scheme unless <html data-theme> is set.
+ */
+:root {
+  color-scheme: light;
+  --rp-base: #faf4ed;
+  --rp-surface: #fffaf3;
+  --rp-overlay: #f2e9e1;
+  --rp-muted: #9893a5;
+  --rp-subtle: #797593;
+  --rp-muted-text: #6a6582;
+  --rp-text: #575279;
+  --rp-love: #b4637a;
+  --rp-gold: #ea9d34;
+  --rp-rose: #d7827e;
+  --rp-pine: #286983;
+  --rp-foam: #56949f;
+  --rp-iris: #907aa9;
+  --rp-hl-low: #f4ede8;
+  --rp-hl-med: #dfdad9;
+  --rp-hl-high: #cecacd;
+  /* Text on accent fills, and accent text on base/surface (AA-checked). */
+  --rp-accent-fill: #286983;
+  --rp-on-accent: #fffaf3;
+  --rp-accent-text: #286983;
+  --rp-danger-text: #984b62;
+  --rp-warn-text: #8a5a14;
+  --rp-focus: #907aa9;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --rp-base: #191724;
+  --rp-surface: #1f1d2e;
+  --rp-overlay: #26233a;
+  --rp-muted: #6e6a86;
+  --rp-subtle: #908caa;
+  --rp-muted-text: #a5a1bf;
+  --rp-text: #e0def4;
+  --rp-love: #eb6f92;
+  --rp-gold: #f6c177;
+  --rp-rose: #ebbcba;
+  --rp-pine: #31748f;
+  --rp-foam: #9ccfd8;
+  --rp-iris: #c4a7e7;
+  --rp-hl-low: #21202e;
+  --rp-hl-med: #403d52;
+  --rp-hl-high: #524f67;
+  --rp-accent-fill: #9ccfd8;
+  --rp-on-accent: #191724;
+  --rp-accent-text: #9ccfd8;
+  --rp-danger-text: #eb6f92;
+  --rp-warn-text: #f6c177;
+  --rp-focus: #c4a7e7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --rp-base: #191724;
+    --rp-surface: #1f1d2e;
+    --rp-overlay: #26233a;
+    --rp-muted: #6e6a86;
+    --rp-subtle: #908caa;
+    --rp-muted-text: #a5a1bf;
+    --rp-text: #e0def4;
+    --rp-love: #eb6f92;
+    --rp-gold: #f6c177;
+    --rp-rose: #ebbcba;
+    --rp-pine: #31748f;
+    --rp-foam: #9ccfd8;
+    --rp-iris: #c4a7e7;
+    --rp-hl-low: #21202e;
+    --rp-hl-med: #403d52;
+    --rp-hl-high: #524f67;
+    --rp-accent-fill: #9ccfd8;
+    --rp-on-accent: #191724;
+    --rp-accent-text: #9ccfd8;
+    --rp-danger-text: #eb6f92;
+    --rp-warn-text: #f6c177;
+    --rp-focus: #c4a7e7;
+  }
+}
+
+@theme inline {
+  --color-base: var(--rp-base);
+  --color-surface: var(--rp-surface);
+  --color-overlay: var(--rp-overlay);
+  --color-muted: var(--rp-muted);
+  --color-subtle: var(--rp-subtle);
+  --color-muted-text: var(--rp-muted-text);
+  --color-text: var(--rp-text);
+  --color-love: var(--rp-love);
+  --color-gold: var(--rp-gold);
+  --color-rose: var(--rp-rose);
+  --color-pine: var(--rp-pine);
+  --color-foam: var(--rp-foam);
+  --color-iris: var(--rp-iris);
+  --color-hl-low: var(--rp-hl-low);
+  --color-hl-med: var(--rp-hl-med);
+  --color-hl-high: var(--rp-hl-high);
+  --color-accent-fill: var(--rp-accent-fill);
+  --color-on-accent: var(--rp-on-accent);
+  --color-accent-text: var(--rp-accent-text);
+  --color-danger-text: var(--rp-danger-text);
+  --color-warn-text: var(--rp-warn-text);
+  --color-focus: var(--rp-focus);
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans CJK SC', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--rp-base);
+    color: var(--rp-text);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-base text-text font-sans antialiased;
+    min-height: 100vh;
+  }
+  /* One visible, high-contrast focus ring for every interactive element. */
+  :focus-visible {
+    outline: 3px solid var(--rp-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  code,
+  kbd {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-hl-med bg-surface p-4;
+  }
+  .panel-title {
+    @apply text-xs font-semibold tracking-widest text-muted-text uppercase;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-hl-high bg-surface px-3 py-1.5 text-sm font-medium text-text hover:bg-overlay disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply border-accent-fill bg-accent-fill text-on-accent hover:bg-accent-fill/90;
+  }
+  .field {
+    @apply rounded-lg border border-hl-high bg-base px-2 py-1.5 text-sm text-text;
+  }
+  .code-chip {
+    @apply inline-block rounded border border-hl-high bg-overlay px-1.5 py-0.5 font-mono text-xs text-text;
+  }
+  .data-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .data-table th {
+    @apply border-b border-hl-high px-2 py-1 text-xs font-semibold text-muted-text;
+  }
+  .data-table td {
+    @apply border-b border-hl-low px-2 py-1 align-top;
+  }
+}

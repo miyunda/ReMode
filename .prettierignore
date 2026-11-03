@@ -5,3 +5,5 @@ fixtures/generated/
 docs/
 corpus/
 *.md
+playwright-report/
+test-results/

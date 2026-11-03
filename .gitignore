@@ -16,3 +16,8 @@ coverage/
 
 # Essen corpus: CCARH licence forbids redistribution (spec 12.2)
 corpus/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/

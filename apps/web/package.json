@@ -1,13 +1,39 @@
 {
   "name": "@remode/web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "description": "Browser workbench (M2). Placeholder only in M0.",
+  "description": "Browser workbench (M2): static React + Vite app; everything runs locally through @remode/core.",
   "scripts": {
-    "build": "echo \"@remode/web: placeholder, nothing to build until M2\"",
-    "typecheck": "echo \"@remode/web: placeholder\"",
-    "test": "echo \"@remode/web: placeholder\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "screenshots": "SCREENSHOTS=1 playwright test --workers=1"
+  },
+  "dependencies": {
+    "@remode/core": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "jsdom": "30.1.3",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.1.0"
   }
 }
