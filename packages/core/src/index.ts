@@ -11,3 +11,4 @@ export * from './analysis/analyzer.js';
 export * from './midi/import.js';
 export * from './midi/validator.js';
 export * from './midi/text.js';
+export * from './text/jianpu.js';
