@@ -709,6 +709,7 @@ v1 不包含 AI，也不写任何服务端代码：部署形态是只含静态�
 - **其他**：`//` 起行注释；`||` 视同一条小节线；记号之间可不留空格（`1_2_3_`）；固定力度 96/127；音符 ID 为 `jianpu:n<k>`（按出现顺序，休止不占号）。
 - **错误与警告**：错误一律带 `line`、`column`（1 起）与代码，解析会报告全部错误而非只报第一个。连音、圆括号/方括号/花括号 → `UNSUPPORTED_TUPLET`，`~ ^ * tr` 等 → `UNSUPPORTED_ORNAMENT`，`|:` `:|` `%` → `UNSUPPORTED_REPEAT`，三条减时线与双附点 → `UNSUPPORTED_DURATION`，重升重降 → `UNSUPPORTED_ACCIDENTAL`。小节时值与拍号不符只是 `BAR_DURATION_MISMATCH` 警告（含弱起小节）。
 - **限制**：文本 ≤ 100 000 字符、音符 ≤ 20 000，与 MIDI 导入一致。
+- **反向写出（M2b，`writeJianpu`，`packages/core/src/text/jianpuWriter.ts`）**：旋律 → 同一语法的文本，经 `parseJianpu` 读回后音高与 tick 完全相同（fast-check 往返测试）。音符写成“头（`1` / `1_` / `1__`，可带附点）+ 整拍 `-`”，休止在拍点和小节线处拆开，`1=` 取调号（新建旋律取所选调）。多个速度或拍号、重叠、无法换算到 PPQ 480 的 tick、非十六分音符倍数的时值都报结构化错误，从不取整。
 
 ---
 
@@ -875,10 +876,10 @@ Invariant G:
 - [x] React/Vite/Tailwind 页面与 Rosé Pine Dawn/Dark 配色。（M2a：跟随系统，可手动切换并保存）
 - [x] 拖拽 MIDI、简谱文本输入、轨道选择、预检反馈、来源调式纠正。（M2a，见 `docs/decisions/m2a-implementation-notes.md`）
 - [x] 转换操作选择（同主音换调式 / 移调）、目标 root/mode、Strict 生成与下载。（M2a：逐音 diff 表与回检；卷帘上的高亮属 M2b）
-- [ ] Piano Roll 原曲/目标差异高亮；新建旋律模式。
+- [x] Piano Roll 原曲/目标差异高亮；新建旋律模式。（M2b：Canvas 卷帘、非纯颜色差异标记、同步音符表；见 `docs/decisions/m2b-implementation-notes.md`）
 - [ ] Tone.js 播放控制、共享进度、循环范围、主音持续低音（drone）。
-- [ ] 手动调整单个音符；Undo/Redo；原曲不可变。
-- [ ] 响应式布局与基本键盘可访问性。（M2a 已完成导入/分析/目标部分：手机宽度无横向滚动、焦点环、跳转链接、AA 对比度；卷帘与播放控件随 M2b/M2c 补齐）
+- [x] 手动调整单个音符；Undo/Redo；原曲不可变。（M2b：`custom` 变体，`MANUAL_EDIT`，吸附目标音阶，有界历史 100 步）
+- [ ] 响应式布局与基本键盘可访问性。（M2a 已完成导入/分析/目标部分：手机宽度无横向滚动、焦点环、跳转链接、AA 对比度；M2b 补齐卷帘：键盘选择/修音、卷帘框内滚动、读屏用同步音符表；播放控件随 M2c 补齐）
 
 **DoD**：断网运行基本工作流；上传或输入后能听到（含 drone）并导出 Strict 版本；手动编辑后也能导出。
 
