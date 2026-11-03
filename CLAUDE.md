@@ -23,7 +23,9 @@
 - `node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track N] [--repair]`，或 `analyze --jianpu "<简谱>"`：JSON 分析报告。
 - `node tools/cli/dist/main.js export <file.jianpu> [-o out.mid]`，或 `export --jianpu "<简谱>"`：简谱 → MIDI（不做任何变换）。两个子命令一致：位置参数是文件（按扩展名判断格式），`--jianpu` 永远是内联文本。
 - `node tools/cli/dist/main.js transpose <input> --semitones N [-o out.mid]`：半音移调；`remode <input> --to [<root>:]<scaleId> [--from <root>:<scaleId>] [--accidentals nearest|preserve|reject] [--no-range] [-o out.mid]`：Strict 同主音换调式（带根音的 `--to` 为“移调 + 换调式”两步）。来源调式在 rank 1 有歧义时退出码 6，需 `--from`。
-- 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`；M1a：`m1a-implementation-notes.md`；M1b：`m1b-implementation-notes.md`）。
+- `pnpm dev` / `pnpm preview`：Web 开发服务器 / 以生产 `_headers`（CSP）预览 `apps/web/dist`。`pnpm e2e`：Playwright E2E（先 `pnpm --filter @remode/web exec playwright install --with-deps chromium`），CI 的 `check` 任务同样执行。`pnpm --filter @remode/web screenshots`：重新生成 `docs/screenshots/m2a/`。
+- Web 端只经 `@remode/core` 在浏览器本地处理，运行时不得发起任何网络请求（E2E 断言）；CSP 在 `apps/web/public/_headers`。
+- 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`；M1a：`m1a-implementation-notes.md`；M1b：`m1b-implementation-notes.md`；M2a：`m2a-implementation-notes.md`）。
 
 ### 分支与发布流程
 

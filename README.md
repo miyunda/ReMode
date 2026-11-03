@@ -10,10 +10,12 @@ runs in the browser. There is no backend and no AI.
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M1b (strict transforms).** M0 added MIDI import, monophony validation
-and mode analysis. M1a added jianpu (numbered notation) input and MIDI export. M1b adds
-chromatic transpose and the strict parallel remode (same tonic, new mode), all from the
-command line. The web UI comes in M2 and the Expressive optimiser in M3.
+**Status: milestone M2a (web import and analysis).** M0 added MIDI import, monophony
+validation and mode analysis. M1a added jianpu (numbered notation) input and MIDI export.
+M1b added chromatic transpose and the strict parallel remode (same tonic, new mode). M2a adds
+the browser workbench: import, analysis, source-mode correction, Strict generation, a
+per-note diff and MIDI download. The piano roll (M2b), playback (M2c) and the Expressive
+optimiser (M3) come later.
 
 ## Repository layout
 
@@ -23,7 +25,7 @@ command line. The web UI comes in M2 and the Expressive optimiser in M3.
 | `tools/cli` | `@remode/cli`: the `remode` command. |
 | `tools/fixtures` | Deterministic fixture generator (MIDI and jianpu text), which writes to `fixtures/generated/`. |
 | `fixtures/generated` | Committed `.mid` and `.jianpu` fixtures and `manifest.json` (description and expected behaviour of each fixture). |
-| `apps/web` | Placeholder for the M2 browser workbench. |
+| `apps/web` | `@remode/web`: the browser workbench (React + Vite + Tailwind), a static site that runs `@remode/core` locally. |
 
 ## Setup
 
@@ -37,6 +39,7 @@ pnpm lint        # ESLint + Prettier check
 pnpm test
 pnpm build
 pnpm smoke       # runs the built CLI once
+pnpm e2e         # Playwright against the built web app (see "Web workbench")
 ```
 
 After changing `tools/fixtures/src/catalog.ts`, regenerate the fixtures with
@@ -193,6 +196,76 @@ accidentals, double dots, thirty-seconds and mid-piece key, tempo or time change
 rejected with a structured error (`code`, `line`, `column`). Every note gets velocity 96/127
 and a stable ID `jianpu:n<k>`. The full rules are in spec §10.8.1.
 
+## Web workbench
+
+`apps/web` is a static single-page app. Every step (parsing, validation, analysis, Strict
+generation, export) runs in the browser through `@remode/core`.
+
+**Privacy.** Files and jianpu text are read and processed only in your browser. Nothing is
+uploaded, nothing is stored (only the theme choice is saved, in `localStorage`), and the
+app makes no network requests after its own static files have loaded. The E2E suite checks
+this, and the Content Security Policy (`connect-src 'self'`, self-only scripts and styles,
+no external fonts) enforces it.
+
+```bash
+pnpm dev                              # Vite dev server (http://localhost:5173)
+pnpm build                            # builds every package; the site goes to apps/web/dist
+pnpm preview                          # serves apps/web/dist with the production headers (CSP)
+pnpm --filter @remode/web exec playwright install --with-deps chromium   # once per machine
+pnpm e2e                              # builds the site, then runs the Playwright suite
+pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2a/
+```
+
+What M2a does: import `.mid` / `.midi` / `.jianpu` / `.txt` (drag-and-drop or picker) or
+type jianpu text; choose a track when a file has several melody candidates (each track shows
+its note count, range and whether it looks polyphonic); see the validation report in Chinese
+with its structured codes, and opt into the safe legato repair after seeing what it changes;
+see the analysis (candidates ranked by named tonic evidence, compatible collections, unused
+degrees, out-of-set notes, ambiguity codes, a pitch-class chart with a data table, and
+`analysisVersion`); set the source mode by hand (church modes by root, Chinese modes as
+宫系统 + 主音), which overrides detection and is marked as manual; generate a Strict parallel
+remode or a transpose; and download the result as MIDI. No percentage or confidence is shown
+anywhere. The piano roll and playback areas are labelled placeholders.
+
+**Limits** (initial values; measurements in
+[`docs/decisions/m2a-implementation-notes.md`](docs/decisions/m2a-implementation-notes.md)):
+
+| Limit | Value | Error code |
+|---|---|---|
+| File size (checked before reading) | 1 MiB | `FILE_TOO_LARGE` |
+| Notes in a MIDI file, all tracks | 20 000 | `TOO_MANY_NOTES` |
+| Notes in the melody being processed (selected track or jianpu) | 5 000 | `MELODY_TOO_LONG` / `TOO_MANY_NOTES` |
+| Jianpu text | 100 000 characters | `TEXT_TOO_LONG` |
+
+### Deploying to Cloudflare Pages
+
+The site is static, so there are no Functions, Workers, `wrangler.toml` or secrets. In the
+Cloudflare dashboard go to **Workers & Pages → Create → Pages → Connect to Git**, choose
+`miyunda/ReMode`, and use these settings:
+
+| Setting | Value |
+|---|---|
+| Framework preset | `None` |
+| Build command | `pnpm build` |
+| Build output directory | `apps/web/dist` |
+| Root directory (advanced) | *(leave empty: the repository root)* |
+| Environment variable (Production and Preview) | `PNPM_VERSION` = `12.16.1` |
+| Node.js version | from the committed `.node-version` (`24`); no variable needed |
+| Production branch | `main` |
+| Preview branches (Settings → Builds → Branch control) | **All non-Production branches** |
+| Build system version | v3 (the default) |
+
+Why the pnpm variable is needed: the v3 build image ships pnpm 10.11 and Node 22 by default.
+It reads the Node version from `.node-version` (or `NODE_VERSION`), but it does not read the
+`packageManager` field, the lockfile version or `engines` to choose pnpm. Only
+`PNPM_VERSION` does that. When `PNPM_VERSION` is changed, keep it equal to `packageManager`
+in `package.json`. Cloudflare runs `pnpm install` itself because `pnpm-lock.yaml` is at the root.
+
+`apps/web/public/_headers` sets the CSP and the other security headers. `vite preview` sends
+the same headers, so the E2E suite runs under the production CSP. No `_redirects` file is
+needed: without a top-level `404.html`, Pages treats the project as a single-page app and
+serves `index.html` for unknown paths.
+
 ## Supported input and limitations
 
 Supported: Standard MIDI Files of format 0 and 1 that use ticks-per-quarter-note timing.
@@ -202,8 +275,8 @@ Not supported:
 
 - **MIDI format 2** (independent sequences) is rejected with `UNSUPPORTED_FORMAT`.
 - **SMPTE time division** is rejected with `SMPTE_TIMING`.
-- Files over 4 MiB or with more than 20 000 notes are rejected. These are initial limits
-  and will be tuned after performance testing.
+- In the core API and the CLI, files over 4 MiB or with more than 20 000 notes are rejected.
+  The web app uses tighter limits (see "Web workbench"). These are initial limits.
 - Polyphonic tracks are not analysed. Same-tick chords and overlaps beyond the legato
   tolerance (min(15 ms, PPQ/16)) are reported as errors.
 - Percussion tracks (channel 10) are listed but never treated as melodies.

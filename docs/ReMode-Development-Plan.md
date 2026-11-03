@@ -869,13 +869,15 @@ Invariant G:
 
 ### M2 — Browser Workbench
 
-- [ ] React/Vite/Tailwind 页面与 Rosé Pine Dawn/Dark 配色。
-- [ ] 拖拽 MIDI、简谱文本输入、轨道选择、预检反馈、来源调式纠正。
-- [ ] 转换操作选择（同主音换调式 / 移调）、目标 root/mode、Strict 生成与下载。
+> 拆为三个 PR：**M2a** Web 骨架、导入、分析视图、最小 TARGET 与下载、Cloudflare Pages 就绪；**M2b** Piano Roll、差异高亮、手动修音与撤销；**M2c** Tone.js 试听、共享 Transport、drone。
+
+- [x] React/Vite/Tailwind 页面与 Rosé Pine Dawn/Dark 配色。（M2a：跟随系统，可手动切换并保存）
+- [x] 拖拽 MIDI、简谱文本输入、轨道选择、预检反馈、来源调式纠正。（M2a，见 `docs/decisions/m2a-implementation-notes.md`）
+- [x] 转换操作选择（同主音换调式 / 移调）、目标 root/mode、Strict 生成与下载。（M2a：逐音 diff 表与回检；卷帘上的高亮属 M2b）
 - [ ] Piano Roll 原曲/目标差异高亮；新建旋律模式。
 - [ ] Tone.js 播放控制、共享进度、循环范围、主音持续低音（drone）。
 - [ ] 手动调整单个音符；Undo/Redo；原曲不可变。
-- [ ] 响应式布局与基本键盘可访问性。
+- [ ] 响应式布局与基本键盘可访问性。（M2a 已完成导入/分析/目标部分：手机宽度无横向滚动、焦点环、跳转链接、AA 对比度；卷帘与播放控件随 M2b/M2c 补齐）
 
 **DoD**：断网运行基本工作流；上传或输入后能听到（含 drone）并导出 Strict 版本；手动编辑后也能导出。
 
