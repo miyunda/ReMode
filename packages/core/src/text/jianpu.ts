@@ -121,6 +121,11 @@ const UNSUPPORTED: ReadonlyArray<[RegExp, JianpuErrorCode, string]> = [
   [/[:%$]/, 'UNSUPPORTED_REPEAT', 'Repeat signs are not supported.'],
 ];
 
+const beats = (ticks: number) => {
+  const n = ticks / JIANPU_PPQ;
+  return `${n} beat${n === 1 ? '' : 's'}`;
+};
+
 interface Event {
   kind: 'note' | 'rest';
   /** Semitones above the key note (0 for rests). */
@@ -431,7 +436,7 @@ export function parseJianpu(text: string, options: ParseJianpuOptions = {}): Jia
     if (bar.ticks !== expectedTicks) {
       warnings.push({
         code: 'BAR_DURATION_MISMATCH',
-        message: `Bar ${index} lasts ${bar.ticks / JIANPU_PPQ} beats; ${timeSig.numerator}/${timeSig.denominator} needs ${expectedTicks / JIANPU_PPQ}.`,
+        message: `Bar ${index} lasts ${beats(bar.ticks)}; ${timeSig.numerator}/${timeSig.denominator} needs ${beats(expectedTicks)}.`,
         line: bar.line,
         column: bar.column,
         bar: { index, ticks: bar.ticks, expectedTicks },
