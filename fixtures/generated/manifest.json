@@ -800,6 +800,32 @@
       }
     },
     {
+      "file": "mode-church-c-ionian.jianpu",
+      "bytes": 121,
+      "description": "C Ionian in 1=C, as in mode-church-c-ionian.mid: every degree used. Source of the M1b strict remode tests.",
+      "expect": {
+        "jianpu": {
+          "noteCount": 18,
+          "warnings": [],
+          "twin": "mode-church-c-ionian.mid"
+        },
+        "analysis": {
+          "top": {
+            "root": "C",
+            "scaleId": "ionian",
+            "name": "C Ionian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
       "file": "mode-church-c-dorian.jianpu",
       "bytes": 127,
       "description": "C Dorian written 首调 (1=Bb, the tonic is 2), as in mode-church-c-dorian.mid.",
