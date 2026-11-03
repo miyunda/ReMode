@@ -52,6 +52,8 @@ export function notesOf(spec: Array<[number, number, number]>, ppq = 480): Melod
     pitch,
     startTick: Math.round(start * ppq),
     durationTick: Math.round(beats * ppq),
-    velocity: 0.75,
+    velocity: 96 / 127, // a 7-bit MIDI velocity, so export is exact
   }));
 }
+
+export const fixtureText = (file: string): string => readFileSync(`${FIXTURE_DIR}${file}`, 'utf8');

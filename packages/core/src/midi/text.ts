@@ -32,3 +32,27 @@ function strictUtf8(latin1: string): string | null {
 export function decodeMidiText(raw: string): string {
   return strictUtf8(raw) ?? raw;
 }
+
+/**
+ * UTF-8 bytes as a byte-per-char string, the form midi-file writes verbatim.
+ * Hand-rolled because core's lib target (ES2023, no DOM) has no TextEncoder.
+ */
+export function encodeMidiText(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) as number;
+    if (cp < 0x80) out += ch;
+    else if (cp < 0x800) out += String.fromCharCode(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+    else if (cp < 0x10000) {
+      out += String.fromCharCode(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+    } else {
+      out += String.fromCharCode(
+        0xf0 | (cp >> 18),
+        0x80 | ((cp >> 12) & 0x3f),
+        0x80 | ((cp >> 6) & 0x3f),
+        0x80 | (cp & 0x3f),
+      );
+    }
+  }
+  return out;
+}
