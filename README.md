@@ -274,7 +274,12 @@ How the build environment is chosen (Workers Builds docs):
   `wrangler.jsonc`, even an empty one (`"previews": {}`). Assets and compatibility settings
   stay at the top level. Each branch gets a Preview URL of the form
   `<branch>-remode.<subdomain>.workers.dev`. `preview_urls` is set explicitly: otherwise it
-  follows the `workers_dev` setting, and a Worker that has never been deployed gets no Preview URL. If the beta misbehaves, set the Preview
+  follows the `workers_dev` setting, and a Worker that has never been deployed gets no Preview URL.
+- **Preview URLs also need the dashboard:** the account must have a workers.dev subdomain
+  (**Workers & Pages → Overview → Subdomain**), and preview URLs must be on for the Worker
+  (**remode → Settings → Domains & Routes → Preview URLs: Enable**). `wrangler.jsonc` sets
+  `workers_dev` / `preview_urls`, but only `wrangler deploy` (production) applies them. Until
+  the first successful production deploy, preview builds can succeed with "No Preview URL". If the beta misbehaves, set the Preview
   command to the stable `pnpm exec wrangler versions upload`. That uploads a version with a
   Version URL instead of a per-branch Preview URL, and needs no `previews` block.
 - Build variables are build-time only and invisible at runtime. Runtime variables and
