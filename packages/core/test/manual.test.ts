@@ -83,9 +83,9 @@ describe('manual edit helpers', () => {
             const r = applyManualEdit(notes, `n${k % pitches.length}`, p);
             if (r.ok) notes = r.notes;
           }
-          expect(notes.map(({ pitch: _, ...rest }) => rest)).toEqual(
-            original.map(({ pitch: _, ...rest }) => rest),
-          );
+          const timing = (ns: readonly MelodyNote[]) =>
+            ns.map((n) => [n.id, n.startTick, n.durationTick, n.velocity]);
+          expect(timing(notes)).toEqual(timing(original));
         },
       ),
       SEED,
