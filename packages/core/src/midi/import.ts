@@ -13,6 +13,7 @@ import type {
   TempoEvent,
   TimeSignatureEvent,
 } from '../types.js';
+import { decodeMidiText } from './text.js';
 
 export interface ImportLimits {
   maxFileBytes: number;
@@ -255,7 +256,7 @@ export function importMidi(
     return {
       id,
       index,
-      name: t.name,
+      name: decodeMidiText(t.name),
       channel: t.channel,
       instrumentProgram: t.instrument.number,
       isPercussion: notes.length > 0 && t.channel === 9,
