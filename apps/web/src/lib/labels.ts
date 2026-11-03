@@ -113,6 +113,16 @@ const LABELS: Readonly<Record<string, string>> = {
   ACCIDENTAL_NEAREST: '调外音就近处理',
   TRANSPOSE: '移调',
   RANGE_ADJUSTMENT: '音域调整',
+  MANUAL_EDIT: '手动修改',
+  // Manual editing
+  OUT_OF_TARGET_SCALE: '不在目标音阶内',
+  // Jianpu text export
+  TEMPO_CHANGE: '含速度变化',
+  TIME_SIGNATURE_CHANGE: '含拍号变化',
+  UNSUPPORTED_TIME_SIGNATURE: '简谱不支持此拍号',
+  PPQ_NOT_DIVISIBLE: 'PPQ 无法精确换算',
+  UNREPRESENTABLE_DURATION: '简谱无法表示此时值',
+  UNREPRESENTABLE_REST: '简谱无法表示此休止',
 };
 
 export const codeLabel = (code: string): string => LABELS[code] ?? code;
@@ -176,3 +186,25 @@ export const ambiguityReasonText = (reason: string): string =>
       : reason === 'NO_ANALYSIS'
         ? '尚未分析'
         : `${codeLabel(reason)}（${reason}）`;
+
+const DEGREE_ROLES: Readonly<Record<string, string>> = {
+  tonic: '主音',
+  supertonic: '上主音',
+  mediant: '中音',
+  subdominant: '下属音',
+  dominant: '属音',
+  submediant: '下中音',
+  'leading-tone': '导音',
+  subtonic: '下主音（♭7）',
+  gong: '宫',
+  shang: '商',
+  jue: '角',
+  zhi: '徵',
+  yu: '羽',
+  qingjiao: '清角',
+  bianzhi: '变徵',
+  biangong: '变宫',
+  run: '闰',
+};
+
+export const degreeRoleLabel = (role: string): string => DEGREE_ROLES[role] ?? role;

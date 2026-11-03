@@ -3,6 +3,7 @@ import {
   collectionLabel,
   collectionPitchClasses,
   pitchClassName,
+  type Ambiguity,
   type CollectionMatch,
   type ModeCandidate,
 } from '@remode/core';
@@ -10,7 +11,7 @@ import { beats } from '../lib/format';
 import { EVIDENCE_LABELS, codeLabel } from '../lib/labels';
 import { useProject } from '../state/ProjectContext';
 import { PcdChart } from './PcdChart';
-import { CodeChip, Issue, Section, TableScroll } from './ui';
+import { CodeChip, Issue, Section, Severity, TableScroll } from './ui';
 
 const sameCollection = (a: CollectionMatch, b: CollectionMatch) =>
   a.collectionId === b.collectionId && a.transposition === b.transposition;
@@ -133,6 +134,35 @@ function CandidateCard({ c, noteIndex }: { c: ModeCandidate; noteIndex: Map<stri
   );
 }
 
+/** MISSING_DEGREES lists every affected mode; a one-line summary is shown until expanded. */
+function CollapsedAmbiguity({ a }: { a: Ambiguity }) {
+  const modes = a.affectedModes ?? [];
+  const missing = a.missingDegrees ?? [];
+  return (
+    <li
+      className="rounded-lg border border-hl-med bg-base p-2 text-sm"
+      data-code={a.code}
+      data-testid="ambiguity-collapsed"
+    >
+      <details>
+        <summary className="flex cursor-pointer flex-wrap items-center gap-2">
+          <Severity level="info" />
+          <CodeChip code={a.code} />
+          <span className="font-medium">{codeLabel(a.code)}</span>
+          <span className="text-xs text-muted-text">
+            {missing.length > 0 && `缺 ${missing.length} 个音级 · `}涉及 {modes.length} 个调式
+          </span>
+          <span className="text-xs text-accent-text underline">展开</span>
+        </summary>
+        <p className="mt-1">{a.detail}</p>
+        {modes.length > 0 && (
+          <p className="text-xs text-muted-text">涉及：{modes.map((m) => m.name).join('、')}</p>
+        )}
+      </details>
+    </li>
+  );
+}
+
 export function AnalysisView() {
   const { analysis, original } = useProject();
   const noteIndex = useMemo(
@@ -179,15 +209,19 @@ export function AnalysisView() {
           <p className="text-sm text-muted-text">无。</p>
         ) : (
           <ul className="flex flex-col gap-2" data-testid="ambiguities">
-            {analysis.ambiguities.map((a, i) => (
-              <Issue key={i} level="info" code={a.code} text={a.detail}>
-                {(a.affectedModes?.length ?? 0) > 0 && (
-                  <p className="text-xs text-muted-text">
-                    涉及：{a.affectedModes?.map((m) => m.name).join('、')}
-                  </p>
-                )}
-              </Issue>
-            ))}
+            {analysis.ambiguities.map((a, i) =>
+              a.code === 'MISSING_DEGREES' ? (
+                <CollapsedAmbiguity key={i} a={a} />
+              ) : (
+                <Issue key={i} level="info" code={a.code} text={a.detail}>
+                  {(a.affectedModes?.length ?? 0) > 0 && (
+                    <p className="text-xs text-muted-text">
+                      涉及：{a.affectedModes?.map((m) => m.name).join('、')}
+                    </p>
+                  )}
+                </Issue>
+              ),
+            )}
           </ul>
         )}
       </div>

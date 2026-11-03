@@ -54,7 +54,7 @@ export function LoadFailureView({ failure }: { failure: LoadFailure }) {
 
 export function ImportPanel() {
   const dispatch = useDispatch();
-  const { loadFailure } = useProject();
+  const { loadFailure, draft } = useProject();
   const [text, setText] = useState('');
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -174,6 +174,21 @@ export function ImportPanel() {
           </button>
         </div>
       </form>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-hl-med pt-3">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => dispatch({ type: 'NEW_MELODY' })}
+          disabled={draft !== null}
+          data-testid="new-melody"
+        >
+          新建旋律
+        </button>
+        <p className="text-xs text-muted-text">
+          {draft ? '正在新建旋律：在右侧卷帘中添加音符。' : '在空白卷帘上按网格画一段旋律。'}
+        </p>
+      </div>
 
       {loadFailure && <LoadFailureView failure={loadFailure} />}
     </div>
