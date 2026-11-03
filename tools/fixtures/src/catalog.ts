@@ -506,6 +506,17 @@ export function buildFixtures(): Fixture[] {
   };
 
   jianpu(
+    'mode-church-c-ionian.jianpu',
+    'C Ionian in 1=C, as in mode-church-c-ionian.mid: every degree used. Source of the M1b strict remode tests.',
+    `// C Ionian: every degree, both phrases end on 1.
+1=C 4/4 ♩=120
+| 1 3 5 4 | 3 2 1 - |
+| 5 6 7 1' | 7 6 5 4 | 3 2 1 - |
+`,
+    { noteCount: 18, warnings: [], twin: 'mode-church-c-ionian.mid' },
+  );
+
+  jianpu(
     'mode-church-c-dorian.jianpu',
     'C Dorian written 首调 (1=Bb, the tonic is 2), as in mode-church-c-dorian.mid.',
     `// C Dorian: Bb 宫系统, tonic 2 (re).
