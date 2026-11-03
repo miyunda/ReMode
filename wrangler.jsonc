@@ -11,4 +11,8 @@
     // Unknown paths get /index.html with 200 (client-side routing).
     "not_found_handling": "single-page-application",
   },
+  // Required by `wrangler preview` (the Workers Builds Preview command for
+  // non-production branches). Empty: a Preview uses the top-level settings;
+  // assets and compatibility settings must stay at the top level.
+  "previews": {},
 }
