@@ -1,0 +1,12 @@
+{
+  "name": "@remode/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser workbench (M2). Placeholder only in M0.",
+  "scripts": {
+    "build": "echo \"@remode/web: placeholder, nothing to build until M2\"",
+    "typecheck": "echo \"@remode/web: placeholder\"",
+    "test": "echo \"@remode/web: placeholder\""
+  }
+}
