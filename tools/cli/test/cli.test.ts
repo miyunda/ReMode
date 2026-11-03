@@ -339,6 +339,21 @@ describe('remode remode', () => {
     ]);
   });
 
+  it('maps 五声 → 五声 by scale position', () => {
+    const r = run('remode', 'missing-degrees-cdega.jianpu', '--to', 'pentatonic-yu');
+    expect(r.code).toBe(EXIT.OK);
+    expect(r.json.sourceMode.scaleId).toBe('pentatonic-gong');
+    expect(r.json.diagnostics.mapping).toBe('scale-position');
+    expect(new Set(r.json.diff.map((d: Diff) => `${d.from}→${d.to}`))).toEqual(
+      new Set(['D4→Eb4', 'E4→F4', 'A4→Bb4']),
+    );
+    expect(new Set(r.json.diff.map((d: Diff) => d.reasonCode))).toEqual(
+      new Set(['SCALE_POSITION_MAPPED']),
+    );
+    expect(r.json.warnings).toEqual([]);
+    expect(r.json.recheck.recognised).toBe(true);
+  });
+
   it('reports NO_CHARACTERISTIC_DEGREE and an honest re-check', () => {
     const r = run('remode', 'missing-degrees-cdega.jianpu', '--from', 'C:ionian', '--to', 'lydian');
     expect(r.code).toBe(EXIT.OK);

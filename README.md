@@ -97,8 +97,11 @@ work). IDs, ticks, durations and velocities are kept. Source key signatures are 
 is `<source>-transpose-up<n>.mid` or `-down<n>.mid`.
 
 `remode` is the strict parallel remode (spec §7.3): the tonic stays and every note moves to
-the target's degree with the same number (by degree identity, never by position in the
-scale), in the same octave. Timing is never changed.
+the target's degree with the same number (by degree identity), in the same octave. Between
+two 五声 modes, or two 六声 modes of the same type, the k-th tone above the tonic maps to the
+target's k-th tone instead (`SCALE_POSITION_MAPPED`; 宫 → 羽 is 1→1, 2→♭3, 3→4, 5→5, 6→♭7),
+because their degree numbers differ. For seven-tone scales the two rules agree. Timing is
+never changed.
 
 - The source mode is the rank-1 analysis candidate. If the analysis is ambiguous at rank 1
   (several rank-1 modes, `TONIC_UNCLEAR`, `MULTIPLE_COLLECTIONS`, `CHROMATIC_HEAVY` or
@@ -119,7 +122,7 @@ scale), in the same octave. Timing is never changed.
   are then an error.
 
 The `remode` report adds `sourceAnalysis`, `sourceMode` (`via` `analysis` or `option`),
-`targetMode`, `transform` (all settings and `remode-strict/1.0.0`), `steps` (tonic change
+`targetMode`, `transform` (all settings and `remode-strict/1.1.0`), `steps` (tonic change
 only), `summary`, `diff` (every changed note with `from`/`to`, `reasonCode` and an
 explanation), `warnings`, `diagnostics` (degree table, characteristic-degree exposure,
 contour, range), `recheck` and the `output`/`export` sections. Warnings include

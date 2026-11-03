@@ -5,7 +5,6 @@ import {
   CHURCH_MODES,
   SCALES,
   chooseNeighbour,
-  degreeMap,
   exportFileName,
   exportMidi,
   findOctaveShift,
@@ -182,6 +181,29 @@ describe('strictRemode: 7 → 7', () => {
     },
   );
 
+  it('degree identity equals scale position on every heptatonic pair', () => {
+    const heptatonic = SCALES.filter((x) => x.intervals.length === 7);
+    // A three-octave run through each source scale on tonic D.
+    for (const s of heptatonic) {
+      expect(s.degreeIdentity.map((d) => d.degree)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      const run = notesOf(
+        [-12, 0, 12].flatMap((o) =>
+          s.intervals.map((i, k) => [62 + o + i, k, 1] as [number, number, number]),
+        ),
+      );
+      for (const t of heptatonic) {
+        const r = remode(run, 2, s.id, t.id);
+        expect(r.report.mapping).toBe('degree-identity');
+        const ordinal = run.map((n) => {
+          const rel = n.pitch - 2;
+          const k = s.intervals.indexOf(mod(rel, 12));
+          return 2 + 12 * Math.floor(rel / 12) + t.intervals[k]!;
+        });
+        expect(r.variant.notes.map((n) => n.pitch)).toEqual(ordinal);
+      }
+    }
+  });
+
   it('C Ionian (jianpu) → Dorian, Lydian with explained changes', () => {
     const dorian = remode(C_IONIAN.notes, 0, 'ionian', 'dorian');
     expect(names(dorian.variant.notes)).toBe(
@@ -206,7 +228,7 @@ describe('strictRemode: 7 → 7', () => {
     expect(lydian.variant.transform).toMatchObject({
       operation: 'parallel-remode',
       strategy: 'strict',
-      version: 'remode-strict/1.0.0',
+      version: 'remode-strict/1.1.0',
       source: { root: 0, scaleId: 'ionian', name: 'C Ionian' },
       target: { root: 0, scaleId: 'lydian', name: 'C Lydian' },
       accidentals: 'nearest',
@@ -252,73 +274,107 @@ describe('strictRemode: notes below the tonic and across octaves', () => {
   });
 });
 
-describe('strictRemode: 5 → 5', () => {
+describe('strictRemode: 5 → 5 and same-type 6 → 6 by scale position', () => {
   const CDEGA = fixtureJianpu('missing-degrees-cdega.jianpu');
+  const PENTATONIC = ['gong', 'shang', 'jue', 'zhi', 'yu'].map((d) => `pentatonic-${d}`);
 
-  it('宫 → 羽: shared degrees by identity, 2 and 6 by SCALE_CONSTRAINT', () => {
+  it('宫 → 羽: 1→1, 2→♭3, 3→4, 5→5, 6→♭7, no collapse', () => {
     const r = remode(CDEGA.notes, 0, 'pentatonic-gong', 'pentatonic-yu');
     // Source: 1 3 5 6 | 5 3 2 1 | - 3 5 6 | 1' 6 5 3 | 2 1
-    expect(names(r.variant.notes)).toBe(
-      'C4 Eb4 G4 Bb4 G4 Eb4 Eb4 C4 Eb4 G4 Bb4 C5 Bb4 G4 Eb4 Eb4 C4',
-    );
-    expect(r.report.degreeMap.filter((e) => e.differs)).toEqual([
-      { degree: 2, source: { label: '2', interval: 2 }, target: null, differs: true },
-      {
-        degree: 3,
-        source: { label: '3', interval: 4 },
-        target: { label: '♭3', interval: 3 },
-        differs: true,
-      },
-      { degree: 4, source: null, target: { label: '4', interval: 5 }, differs: true },
-      { degree: 6, source: { label: '6', interval: 9 }, target: null, differs: true },
-      { degree: 7, source: null, target: { label: '♭7', interval: 10 }, differs: true },
+    expect(names(r.variant.notes)).toBe('C4 F4 G4 Bb4 G4 F4 Eb4 C4 F4 G4 Bb4 C5 Bb4 G4 F4 Eb4 C4');
+    expect(r.report.mapping).toBe('scale-position');
+    expect(r.report.positionMap?.map((e) => `${e.source.label}→${e.target.label}`)).toEqual([
+      '1→1',
+      '2→♭3',
+      '3→4',
+      '5→5',
+      '6→♭7',
     ]);
     const d = r.variant.changes.find((c) => c.noteId === 'jianpu:n6')!;
-    expect(d).toMatchObject({ fromPitch: 62, toPitch: 63, reasonCode: 'SCALE_CONSTRAINT' });
-    expect(d.explanation).toBe(
-      'D4 → Eb4：C 羽调式（Eb 宫系统，五声） 没有第 2 级；候选 C4 / Eb4，取 Eb4（与下一音的进行方向一致）',
-    );
-    expect(r.warnings.map((w) => w.code)).toEqual(['REPETITION_INTRODUCED']);
-    expect(r.report.contour.repeated).toEqual([
-      ['jianpu:n5', 'jianpu:n6'],
-      ['jianpu:n14', 'jianpu:n15'],
-    ]);
+    expect(d).toEqual({
+      noteId: 'jianpu:n6',
+      fromPitch: 62,
+      toPitch: 63,
+      reasonCode: 'SCALE_POSITION_MAPPED',
+      explanation: 'D4 → Eb4：第 2 音位：商（2）→ C 羽调式（Eb 宫系统，五声） 的宫（♭3）',
+    });
+    expect(r.variant.changes.every((c) => c.reasonCode === 'SCALE_POSITION_MAPPED')).toBe(true);
+    expect(r.warnings).toEqual([]);
+    expect(r.report.contour).toMatchObject({ reversed: [], repeated: [] });
+    expect(r.report.characteristic.sounded).toEqual(['2→♭3', '3→4', '6→♭7']);
     const recheck = recheckTarget(
       r.variant.notes,
       { root: 0, scaleId: 'pentatonic-yu' },
-      {
-        ppq: 480,
-      },
+      { ppq: 480 },
     );
     expect(recheck.recognised).toBe(true);
   });
 
-  it('every pentatonic pair stays in the target and maps shared degrees by identity', () => {
-    const tonics = ['gong', 'shang', 'jue', 'zhi', 'yu'];
-    for (const from of tonics) {
-      const src = getScale(`pentatonic-${from}`);
-      // A two-octave run through the source scale on tonic D.
-      const notes = notesOf(
-        [-12, 0, 12].flatMap((o) => src.intervals.map((i) => 62 + o + i)).map((p, k) => [p, k, 1]),
-      );
-      for (const to of tonics) {
-        const tgt = getScale(`pentatonic-${to}`);
-        const r = remode(notes, 2, src.id, tgt.id);
-        const table = degreeMap(src, tgt);
-        notes.forEach((n, i) => {
-          const out = r.variant.notes[i]!.pitch;
-          expect(tgt.intervals).toContain(mod(out - 2, 12));
-          const sd = src.degreeIdentity[src.intervals.indexOf(mod(n.pitch - 2, 12))]!;
-          const entry = table.find((e) => e.degree === sd.degree)!;
-          if (entry.target) {
-            expect(out - n.pitch).toBe(entry.target.interval - entry.source!.interval);
-          } else {
-            expect(Math.abs(out - n.pitch)).toBeLessThanOrEqual(2);
-          }
-        });
-        if (from === to) expect(r.variant.changes).toEqual([]);
+  it.each(PENTATONIC.flatMap((s) => PENTATONIC.filter((t) => t !== s).map((t) => [s, t])))(
+    '%s → %s is bijective and keeps the contour exactly',
+    (from, to) => {
+      const src = getScale(from);
+      const tgt = getScale(to);
+      // A three-octave run up and back down through the source scale on tonic D.
+      const up = [-12, 0, 12].flatMap((o) => src.intervals.map((i) => 62 + o + i));
+      const notes = notesOf([...up, ...[...up].reverse()].map((p, k) => [p, k, 1]));
+      const r = remode(notes, 2, from, to);
+      expect(r.report.mapping).toBe('scale-position');
+      const out = r.variant.notes.map((n) => n.pitch);
+      notes.forEach((n, i) => {
+        const k = src.intervals.indexOf(mod(n.pitch - 2, 12));
+        expect(out[i]! - n.pitch).toBe(tgt.intervals[k]! - src.intervals[k]!);
+      });
+      // Bijective: distinct source pitches stay distinct, so no step becomes a unison.
+      const pairs = new Map(notes.map((n, i) => [n.pitch, out[i]!]));
+      expect(new Set(pairs.values()).size).toBe(pairs.size);
+      for (let i = 1; i < notes.length; i++) {
+        expect(Math.sign(out[i]! - out[i - 1]!)).toBe(
+          Math.sign(notes[i]!.pitch - notes[i - 1]!.pitch),
+        );
       }
-    }
+      expect(r.warnings.map((w) => w.code)).not.toContain('REPETITION_INTRODUCED');
+      expect(r.warnings.map((w) => w.code)).not.toContain('CONTOUR_REVERSED');
+      expect(r.variant.changes.every((c) => c.reasonCode === 'SCALE_POSITION_MAPPED')).toBe(true);
+    },
+  );
+
+  it('accidentals inside 5 → 5 still follow the accidental policy', () => {
+    const { notes } = jianpu('1=C 4/4 | 1 #4 5 3 | 2 1 - - |');
+    const r = remode(notes, 0, 'pentatonic-gong', 'pentatonic-yu');
+    // F# is outside C 宫: nearest neighbour in C 羽 (F or G); next note G → F keeps the rise.
+    expect(names(r.variant.notes)).toBe('C4 F4 G4 F4 Eb4 C4');
+    expect(r.variant.changes[0]).toMatchObject({
+      noteId: 'jianpu:n1',
+      reasonCode: 'ACCIDENTAL_NEAREST',
+    });
+    const rejected = strictRemode(
+      notes,
+      { root: 0, scaleId: 'pentatonic-gong' },
+      { scaleId: 'pentatonic-yu' },
+      { accidentals: 'reject' },
+    );
+    expect(!rejected.ok && rejected.errors[0]?.code).toBe('ACCIDENTAL_REJECTED');
+  });
+
+  it('6 → 6 by position within one type; across types by degree identity', () => {
+    const same = remode(C_IONIAN.notes, 0, 'hexa-qingjiao-gong', 'hexa-qingjiao-yu');
+    expect(same.report.mapping).toBe('scale-position');
+    expect(same.report.positionMap?.map((e) => `${e.source.label}→${e.target.label}`)).toEqual([
+      '1→1',
+      '2→♭3',
+      '3→4',
+      '4→5',
+      '5→♭6',
+      '6→♭7',
+    ]);
+    const cross = remode(C_IONIAN.notes, 0, 'hexa-qingjiao-gong', 'hexa-biangong-gong');
+    expect(cross.report.mapping).toBe('degree-identity');
+    expect(cross.report.positionMap).toBeNull();
+    // 5 ↔ 6 and 5 ↔ 7 are never positional.
+    expect(remode(CDEGA.notes, 0, 'pentatonic-gong', 'hexa-qingjiao-gong').report.mapping).toBe(
+      'degree-identity',
+    );
   });
 });
 

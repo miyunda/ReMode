@@ -162,4 +162,44 @@ describe('strict remode properties', () => {
       SEED,
     );
   });
+
+  it('5 → 5 and same-type 6 → 6 are bijective and order-preserving on in-scale notes', () => {
+    const positional = SCALES.filter((x) => x.intervals.length <= 6);
+    fc.assert(
+      fc.property(
+        melody(fc.integer({ min: 24, max: 103 })),
+        fc.integer({ min: 0, max: 11 }),
+        fc.constantFrom(...positional),
+        fc.constantFrom(...positional),
+        (raw, root, src, tgt) => {
+          fc.pre(src.chinese?.scaleType === tgt.chinese?.scaleType);
+          // Snap every pitch into the source scale so all notes are in-scale.
+          const notes = raw.map((n) => {
+            let p = n.pitch;
+            while (!src.intervals.includes(mod(p - root, 12))) p--;
+            return { ...n, pitch: p };
+          });
+          const r = strictRemode(
+            notes,
+            { root, scaleId: src.id },
+            { scaleId: tgt.id },
+            { createdAt: 0 },
+          );
+          if (!r.ok) throw new Error(JSON.stringify(r.errors));
+          expect(r.report.mapping).toBe('scale-position');
+          const out = r.variant.notes.map((n) => n.pitch - r.report.range.shift);
+          for (let i = 0; i < notes.length; i++) {
+            for (let j = 0; j < notes.length; j++) {
+              // Strictly order-preserving, hence injective: no tone collapses.
+              expect(Math.sign(out[i]! - out[j]!)).toBe(
+                Math.sign(notes[i]!.pitch - notes[j]!.pitch),
+              );
+            }
+          }
+          expect(r.warnings.map((w) => w.code)).not.toContain('REPETITION_INTRODUCED');
+        },
+      ),
+      SEED,
+    );
+  });
 });

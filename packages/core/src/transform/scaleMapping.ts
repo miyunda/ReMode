@@ -26,7 +26,7 @@ import { ambitusCentre, findOctaveShift, type OctaveShift, type PitchRange } fro
 import { transpose, type TransposeResult, type TransposeSettings } from './transpose.js';
 
 /** Bump whenever mapping rules, tie-breaks or diagnostics change (CLAUDE.md rule 6). */
-export const STRICT_TRANSFORM_VERSION = 'remode-strict/1.0.0';
+export const STRICT_TRANSFORM_VERSION = 'remode-strict/1.1.0';
 
 /**
  * Notes outside the source scale (spec §7.3):
@@ -93,8 +93,30 @@ export interface DegreeMapEntry {
   differs: boolean;
 }
 
+/**
+ * How in-scale notes are mapped (spec §7.3.1):
+ * - `degree-identity`: to the target degree with the same number (7→7, 5↔7, 6↔7, 5↔6, and
+ *   六声 of different types); a missing number goes to a neighbour;
+ * - `scale-position`: between two scales of the same Chinese type with five or six tones
+ *   (五声 ↔ 五声, 六声加清角 ↔ 六声加清角, 六声加变宫 ↔ 六声加变宫), the k-th tone above the
+ *   tonic maps to the target's k-th tone. Fully determined, bijective, order-preserving.
+ */
+export type MappingKind = 'degree-identity' | 'scale-position';
+
+/** One row of the position table (`scale-position` only). */
+export interface PositionMapEntry {
+  /** 1-based position above the tonic. */
+  position: number;
+  source: { label: string; interval: number; role: string };
+  target: { label: string; interval: number; role: string };
+  differs: boolean;
+}
+
 export interface CharacteristicExposure {
-  /** Labels of degrees that differ between source and target, e.g. "4→♯4", "7 (目标新增)". */
+  /**
+   * Labels of degrees (or positions) that differ between source and target,
+   * e.g. "4→♯4", "7 (目标新增)"; for `scale-position` "2→♭3".
+   */
   differing: string[];
   /** Differing degrees the source melody actually sounds (in-scale notes only). */
   sounded: string[];
@@ -110,7 +132,10 @@ export interface ContourDiagnostics {
 }
 
 export interface StrictRemodeReport {
+  mapping: MappingKind;
   degreeMap: DegreeMapEntry[];
+  /** The table actually used for in-scale notes when `mapping` is `scale-position`. */
+  positionMap: PositionMapEntry[] | null;
   characteristic: CharacteristicExposure;
   contour: ContourDiagnostics;
   range: OctaveShift;
@@ -158,6 +183,43 @@ export function degreeMap(source: ScaleDefinition, target: ScaleDefinition): Deg
     entries.push({ degree, source: s, target: t, differs: s?.interval !== t?.interval });
   }
   return entries;
+}
+
+/** `scale-position` applies between five- or six-tone scales of the same Chinese type. */
+export function mappingKind(source: ScaleDefinition, target: ScaleDefinition): MappingKind {
+  return source.chinese &&
+    target.chinese &&
+    source.chinese.scaleType === target.chinese.scaleType &&
+    source.intervals.length === target.intervals.length &&
+    source.intervals.length <= 6
+    ? 'scale-position'
+    : 'degree-identity';
+}
+
+const ROLE_LABELS: Readonly<Record<string, string>> = {
+  gong: '宫',
+  shang: '商',
+  jue: '角',
+  zhi: '徵',
+  yu: '羽',
+  qingjiao: '清角',
+  bianzhi: '变徵',
+  biangong: '变宫',
+  run: '闰',
+};
+
+export function positionMap(source: ScaleDefinition, target: ScaleDefinition): PositionMapEntry[] {
+  const side = (scale: ScaleDefinition, i: number) => ({
+    label: degreeLabel(scale.degreeIdentity[i] as DegreeIdentity),
+    interval: scale.intervals[i] as number,
+    role: ROLE_LABELS[scale.degreeRoles[i] as string] ?? (scale.degreeRoles[i] as string),
+  });
+  return source.intervals.map((interval, i) => ({
+    position: i + 1,
+    source: side(source, i),
+    target: side(target, i),
+    differs: interval !== target.intervals[i],
+  }));
 }
 
 const differingLabel = (e: DegreeMapEntry): string =>
@@ -222,8 +284,9 @@ const RULE_TEXT: Record<NeighbourRule, string> = {
 /**
  * Strict parallel remode (spec §7.3): `source.root` stays the tonic; each
  * in-scale note keeps its octave relative to the tonic and moves to the
- * target's degree with the same number. A degree the target lacks (偏音)
- * goes to a neighbour (`SCALE_CONSTRAINT`, see `chooseNeighbour`); notes
+ * target's degree with the same number, or, between five- or six-tone scales
+ * of the same type, to the tone in the same position (see `MappingKind`).
+ * A degree the target lacks (偏音) goes to a neighbour (`SCALE_CONSTRAINT`, see `chooseNeighbour`); notes
  * outside the source scale follow `accidentals`. The whole result is then
  * shifted by at most one whole-octave amount for the range (spec §7.4).
  */
@@ -259,6 +322,8 @@ export function strictRemode(
   const targetName = modeName(root, tgt.id);
   const table = degreeMap(src, tgt);
   const byDegree = new Map(table.map((e) => [e.degree, e]));
+  const kind = mappingKind(src, tgt);
+  const positions = kind === 'scale-position' ? positionMap(src, tgt) : null;
 
   // Accidentals first: `reject` refuses before anything is mapped.
   const outside = notes.filter((n) => !src.intervals.includes(mod(n.pitch - root, 12)));
@@ -294,6 +359,18 @@ export function strictRemode(
     const octave = Math.floor(rel / 12);
     const sIndex = src.intervals.indexOf(mod(rel, 12));
 
+    if (sIndex >= 0 && positions) {
+      const entry = positions[sIndex] as PositionMapEntry;
+      const to = root + 12 * octave + entry.target.interval;
+      mapped[i] = to;
+      if (to !== note.pitch) {
+        reasons.set(i, {
+          code: 'SCALE_POSITION_MAPPED',
+          text: `第 ${entry.position} 音位：${entry.source.role}（${entry.source.label}）→ ${targetName} 的${entry.target.role}（${entry.target.label}）`,
+        });
+      }
+      continue;
+    }
     if (sIndex >= 0) {
       const identity = src.degreeIdentity[sIndex] as DegreeIdentity;
       const entry = byDegree.get(identity.degree) as DegreeMapEntry;
@@ -380,7 +457,9 @@ export function strictRemode(
   }
 
   const outputEqualsInput = changes.length === 0;
-  const characteristic = exposure(notes, root, src, table);
+  const characteristic = positions
+    ? positionExposure(notes, root, src, positions)
+    : exposure(notes, root, src, table);
   if (characteristic.sounded.length === 0) {
     const what =
       characteristic.differing.length === 0
@@ -435,7 +514,9 @@ export function strictRemode(
       changes,
     },
     report: {
+      mapping: kind,
       degreeMap: table,
+      positionMap: positions,
       characteristic,
       contour,
       range: range.fit,
@@ -461,6 +542,21 @@ function exposure(
   return {
     differing: differing.map(differingLabel),
     sounded: differing.filter((e) => e.source && used.has(e.degree)).map(differingLabel),
+  };
+}
+
+function positionExposure(
+  notes: readonly MelodyNote[],
+  root: number,
+  src: ScaleDefinition,
+  positions: readonly PositionMapEntry[],
+): CharacteristicExposure {
+  const used = new Set(notes.map((n) => src.intervals.indexOf(mod(n.pitch - root, 12))));
+  const differing = positions.filter((e) => e.differs);
+  const label = (e: PositionMapEntry) => `${e.source.label}→${e.target.label}`;
+  return {
+    differing: differing.map(label),
+    sounded: differing.filter((e) => used.has(e.position - 1)).map(label),
   };
 }
 

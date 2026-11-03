@@ -40,7 +40,12 @@ export type TransformWarning = TransformIssue<TransformWarningCode> & {
  * `RANGE_ADJUSTMENT` are shared with the Expressive log (spec §8.5).
  */
 export type StrictReasonCode =
-  'DEGREE_MAPPED' | 'SCALE_CONSTRAINT' | 'ACCIDENTAL_NEAREST' | 'TRANSPOSE' | 'RANGE_ADJUSTMENT';
+  | 'DEGREE_MAPPED'
+  | 'SCALE_POSITION_MAPPED'
+  | 'SCALE_CONSTRAINT'
+  | 'ACCIDENTAL_NEAREST'
+  | 'TRANSPOSE'
+  | 'RANGE_ADJUSTMENT';
 
 /** Pitch-only transforms read nothing but `pitch`; everything else is copied untouched. */
 export function checkNotes(notes: readonly MelodyNote[]): TransformError[] {
