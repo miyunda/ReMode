@@ -1,6 +1,7 @@
 {
   "name": "@remode/web",
   "version": "0.0.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Browser workbench (M2). Placeholder only in M0.",

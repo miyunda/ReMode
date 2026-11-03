@@ -118,3 +118,9 @@ The decisions behind these behaviours are in
 Calibration (M4) will use the Essen Folksong Collection © CCARH. That corpus is licensed
 for personal and academic use only and must not be redistributed, so it is never committed:
 local downloads go to the gitignored `corpus/` directory (spec §12.2).
+
+## License
+
+ReMode is released under the [MIT License](LICENSE). The license covers this repository's code,
+documentation and generated fixtures only. It does not cover third-party data such as the Essen
+Folksong Collection, which is under CCARH's own terms (see [Corpus](#corpus)).
