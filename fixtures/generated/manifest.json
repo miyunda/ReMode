@@ -520,6 +520,27 @@
       }
     },
     {
+      "file": "chromatic-twelve-tone.mid",
+      "bytes": 149,
+      "description": "All 12 pitch classes with equal duration: no collection reaches the threshold and all 12 diatonic sets tie.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "ambiguities": [
+            "CHROMATIC_HEAVY"
+          ],
+          "absent": [
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
       "file": "short-three-notes.mid",
       "bytes": 68,
       "description": "C D C: too short to judge.",

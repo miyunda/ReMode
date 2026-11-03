@@ -85,7 +85,7 @@ node tools/cli/dist/main.js analyze fixtures/generated/missing-degrees-cdega.mid
 
 The top candidate is `C 宫调式（C 宫系统，五声）`, with evidence such as `FINAL_NOTE` (尾音为 C)
 and `PHRASE_END` (1 个非末句中 1 个结束于 C). The analysis also reports `MISSING_DEGREES`:
-“旋律未确立第 4、7 级，无法区分 C Ionian / C Mixolydian / C Lydian”.
+“旋律未确立第 4、7 级，无法区分 C Ionian / C Mixolydian / C Lydian；同样无法区分的中国七声读法：…”, listing the 清乐/雅乐/燕乐 readings as well.
 
 ## Supported input and limitations (M0)
 

@@ -1,6 +1,6 @@
 # M0 实现记录与规格偏差
 
-状态：随 `feat/m0-core-cli` 引入，`analysisVersion = remode-mode-2step/0.1.0`。
+状态：随 `feat/m0-core-cli` 引入，`analysisVersion = remode-mode-2step/0.2.0`（0.1.0 → 0.2.0：零点证据不再列出；低于阈值的并列音集不再报 `MULTIPLE_COLLECTIONS`；`MISSING_DEGREES` 说明同时列出中国七声读法）。
 本文件记录 M0 实现时对规格（`docs/ReMode-Development-Plan.md` v1.1）的具体化与偏差（CLAUDE.md 规则 10）。
 
 ## 1. 音集划分（§6.3）
@@ -39,6 +39,7 @@
 | `AMBITUS` | 1 | 最低或最高音为主音（正格），或最低音为属音（变格） |
 | `FIRST_NOTE` | 1 | 首音为主音 |
 
+- 计数型证据按比例取整后为 0 点时不列出（例如 10 个强拍音中只有 1 个命中：round(3 × 1/10) = 0）。
 - 排序键：`evidencePoints` 降序 → 覆盖率降序 → 音集顺序 → 主音音级。点数与覆盖率都相同的候选并列同名次。
 - 这是具名整数点数的透明加和，与每条证据并列输出；不是概率，也不以百分比显示。
 - 只有旋律中实际出现过的音级才能成为主音候选。
@@ -50,10 +51,12 @@
 | 代码 | 触发条件 |
 |---|---|
 | `TOO_SHORT` | 音符数 < 6 或不同音级 < 3 |
-| `CHROMATIC_HEAVY` | 没有音集覆盖率 ≥ 0.95；退回覆盖率最高的自然七声音集，候选带 `BELOW_COVERAGE_THRESHOLD` |
-| `MULTIPLE_COLLECTIONS` | 最小规模的兼容音集多于一个 |
+| `CHROMATIC_HEAVY` | 没有音集覆盖率 ≥ 0.95；退回覆盖率最高的自然七声音集，候选带 `BELOW_COVERAGE_THRESHOLD`。多个音集并列最佳时，说明会列出全部并列项与并列数 |
+| `MULTIPLE_COLLECTIONS` | 最小规模的**兼容**音集（覆盖率达到阈值）多于一个；低于阈值时的并列回退不报此项 |
 | `TONIC_UNCLEAR` | 首选候选领先其他主音不足 2 点，或首选主音没有尾音支持 |
-| `MISSING_DEGREES` | 对首选主音，兼容的自然七声音集给出不止一个教会调式；列出全部教会调式和七声中国解读，以及区分它们所需的级数 |
+| `MISSING_DEGREES` | 对首选主音，兼容的自然七声音集给出不止一个教会调式。`affectedModes` 与说明文字都列出全部教会调式和七声中国读法，并给出区分它们所需的级数 |
+
+**例外**：没有音符（因此没有候选）时，`TOO_SHORT` 的 `affectedScaleIds` 为空数组。这是“每条歧义都带受影响 scale ID”（Invariant G）唯一的例外：此时不存在可列出的调式。
 
 ## 5. MIDI 导入（§5）
 

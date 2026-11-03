@@ -63,10 +63,12 @@ function scaled(
 ): TonicEvidence | null {
   const hits = pool.filter((n) => pitchClass(n.pitch) === tonic);
   if (hits.length === 0) return null;
+  const points = Math.round((maxPoints * hits.length) / pool.length);
+  if (points === 0) return null;
   return {
     kind,
     noteIds: ids(hits),
-    points: Math.round((maxPoints * hits.length) / pool.length),
+    points,
     matched: hits.length,
     of: pool.length,
     detail: describe(hits.length, pool.length),
@@ -76,8 +78,8 @@ function scaled(
 /**
  * Evidence that `tonic` is the tonic. Binary kinds (FINAL_NOTE, FIRST_NOTE,
  * AMBITUS) score their configured points; count-based kinds score
- * round(points × matched / of). Only kinds with at least one supporting note
- * are returned.
+ * round(points × matched / of). Only evidence worth at least one point is
+ * returned, so a count-based kind that rounds to 0 is omitted.
  */
 export function tonicEvidence(
   tonic: number,

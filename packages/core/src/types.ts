@@ -173,6 +173,10 @@ export type AmbiguityCode =
 export interface Ambiguity {
   code: AmbiguityCode;
   detail: string;
+  /**
+   * Scale IDs the ambiguity applies to. Empty only for TOO_SHORT on a melody
+   * with no candidates (e.g. no notes at all).
+   */
   affectedScaleIds: string[];
   /** Fully qualified modes (root + scale) behind `affectedScaleIds`. */
   affectedModes?: ModeName[];

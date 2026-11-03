@@ -43,14 +43,69 @@ describe('collection detection', () => {
     expect(c.unusedDegrees).toEqual([5, 11]);
   });
 
-  it('falls back to the best diatonic set and flags CHROMATIC_HEAVY when nothing reaches the threshold', () => {
+  it('falls back to the best diatonic sets below the threshold without claiming they are compatible', () => {
     const chromatic = notesOf(
       Array.from({ length: 12 }, (_, i) => [60 + i, i, 1] as [number, number, number]),
     );
     const a = analyzeMode(chromatic, opts);
     expect(a.compatibleCollections).toEqual([]);
-    expect(a.ambiguities.map((x) => x.code)).toContain('CHROMATIC_HEAVY');
+    expect(a.selectedCollections).toHaveLength(12); // every diatonic set ties at 7/12
+    const codes = a.ambiguities.map((x) => x.code);
+    expect(codes).toContain('CHROMATIC_HEAVY');
+    expect(codes).not.toContain('MULTIPLE_COLLECTIONS');
+    const heavy = a.ambiguities.find((x) => x.code === 'CHROMATIC_HEAVY')!;
+    expect(heavy.detail).toContain('12 个音集并列最佳');
+    for (const name of ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']) {
+      expect(heavy.detail).toContain(`${name} 自然七声音集`);
+    }
     expect(a.candidates.every((c) => c.warnings.includes('BELOW_COVERAGE_THRESHOLD'))).toBe(true);
+  });
+
+  it('MISSING_DEGREES detail names the Chinese readings as well as the church modes', () => {
+    const r = importMidi(fixtureBytes('missing-degrees-cdega.mid'));
+    if (!r.ok) throw new Error(r.error.code);
+    const a = analyzeMode(r.midi.tracks[0]!.notes, r.midi.metadata);
+    const md = a.ambiguities.find((x) => x.code === 'MISSING_DEGREES')!;
+    for (const m of md.affectedModes!) expect(md.detail).toContain(m.name);
+    expect(md.detail).toContain('C 宫调式（C 宫系统，七声清乐）');
+    expect(md.detail).toContain('C 宫调式（C 宫系统，七声雅乐）');
+    expect(md.detail).toContain('C 宫调式（C 宫系统，七声燕乐）');
+  });
+});
+
+describe('tonic evidence', () => {
+  it('omits count-based evidence that rounds to 0 points', () => {
+    // D sounds on 1 of 9 strong beats: round(3 × 1/9) = 0, so no STRONG_BEAT entry.
+    const notes = notesOf([
+      [60, 0, 1],
+      [62, 1, 1],
+      [64, 2, 1],
+      [67, 3, 1],
+      [60, 4, 1],
+      [64, 5, 1],
+      [67, 6, 1],
+      [69, 7, 1],
+      [60, 8, 1],
+      [64, 9, 1],
+      [67, 10, 1],
+      [69, 11, 1],
+      [62, 12, 1],
+      [64, 13, 1],
+      [69, 14, 1],
+      [64, 15, 1],
+      [60, 16, 4],
+    ]);
+    const a = analyzeMode(notes, opts);
+    const d = a.candidates.find((c) => c.rootPitchClass === 2)!;
+    expect(d.tonicEvidence.find((e) => e.kind === 'STRONG_BEAT')).toBeUndefined();
+  });
+
+  it('never lists 0-point evidence in any fixture', () => {
+    for (const a of allAnalyses()) {
+      for (const c of a.candidates) {
+        for (const e of c.tonicEvidence) expect(e.points).toBeGreaterThan(0);
+      }
+    }
   });
 });
 
@@ -95,6 +150,8 @@ describe('analyzeMode invariants', () => {
     }
   });
 
+  // Invariant G exception: with no notes there are no candidates, so TOO_SHORT
+  // has empty affectedScaleIds (documented in docs/decisions/m0-implementation-notes.md).
   it('every ambiguity carries a code and affected scale IDs (Invariant G)', () => {
     for (const a of allAnalyses()) {
       for (const amb of a.ambiguities) {

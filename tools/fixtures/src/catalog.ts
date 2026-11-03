@@ -246,6 +246,20 @@ export function buildFixtures(): Fixture[] {
   );
 
   add(
+    'chromatic-twelve-tone.mid',
+    'All 12 pitch classes with equal duration: no collection reaches the threshold and all 12 diatonic sets tie.',
+    {
+      import: { ok: true, format: 1, melodyTracks: 1 },
+      analysis: {
+        trackId: 'track-0',
+        ambiguities: ['CHROMATIC_HEAVY'],
+        absent: ['MULTIPLE_COLLECTIONS'],
+      },
+    },
+    single(melody(steps('C4 Db4 D4 Eb4 E4 F4 F#4 G4 Ab4 A4 Bb4 B4'), PPQ)),
+  );
+
+  add(
     'short-three-notes.mid',
     'C D C: too short to judge.',
     {

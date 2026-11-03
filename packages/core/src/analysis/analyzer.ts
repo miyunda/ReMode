@@ -29,7 +29,7 @@ import { segmentPhrases } from './phrases.js';
 import { buildEvidenceContext, tonicEvidence } from './tonic.js';
 
 /** Bump whenever defaults, evidence rules or ranking change (CLAUDE.md rule 6). */
-export const ANALYSIS_VERSION = 'remode-mode-2step/0.1.0';
+export const ANALYSIS_VERSION = 'remode-mode-2step/0.2.0';
 
 /** Initial, uncalibrated values (spec §6.4); to be calibrated in M4. */
 export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
@@ -233,14 +233,18 @@ function findAmbiguities(
 
   if (belowThreshold) {
     const best = selected[0] as CollectionMatch;
+    const coverage = best.coverage.toFixed(3);
+    const which =
+      selected.length > 1
+        ? `${selected.length} 个音集并列最佳（覆盖 ${coverage}）：${selected.map(collectionLabel).join('、')}`
+        : `最佳为 ${collectionLabel(best)}，覆盖 ${coverage}，集外音 ${best.outOfSet.map((o) => pitchClassName(o.pitchClass)).join(' ')}`;
     out.push({
       code: 'CHROMATIC_HEAVY',
-      detail: `没有音集达到覆盖阈值 ${config.coverageThreshold}；最佳为 ${collectionLabel(best)}，覆盖 ${best.coverage.toFixed(3)}，集外音 ${best.outOfSet.map((o) => pitchClassName(o.pitchClass)).join(' ')}`,
+      detail: `没有音集达到覆盖阈值 ${config.coverageThreshold}；${which}`,
       affectedScaleIds: allIds,
     });
-  }
-
-  if (selected.length > 1) {
+  } else if (selected.length > 1) {
+    // Only genuinely compatible sets: tied fallbacks are reported by CHROMATIC_HEAVY.
     out.push({
       code: 'MULTIPLE_COLLECTIONS',
       detail: `${selected.map(collectionLabel).join('、')} 同样兼容`,
@@ -290,6 +294,7 @@ function findAmbiguities(
       )
       .flatMap((m) => modesOnTonic(m.collectionId, m.transposition, root));
     const church = modes.filter((m) => !getScale(m.scaleId).chinese);
+    const chinese = modes.filter((m) => getScale(m.scaleId).chinese);
     if (church.length < 2) continue;
     const missing: number[] = [];
     for (let degree = 1; degree <= 7; degree++) {
@@ -302,7 +307,11 @@ function findAmbiguities(
     }
     out.push({
       code: 'MISSING_DEGREES',
-      detail: `旋律未确立第 ${missing.join('、')} 级，无法区分 ${church.map((m) => m.name).join(' / ')}`,
+      detail: `旋律未确立第 ${missing.join('、')} 级，无法区分 ${church.map((m) => m.name).join(' / ')}${
+        chinese.length > 0
+          ? `；同样无法区分的中国七声读法：${chinese.map((m) => m.name).join('、')}`
+          : ''
+      }`,
       affectedScaleIds: unique(modes.map((m) => m.scaleId)),
       affectedModes: modes,
       missingDegrees: missing,
