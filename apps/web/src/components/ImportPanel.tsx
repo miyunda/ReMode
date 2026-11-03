@@ -60,6 +60,8 @@ export function ImportPanel() {
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const textId = useId();
+  const countId = useId();
+  const overLimit = text.length > WEB_LIMITS.maxJianpuChars;
   const limitsId = useId();
 
   const apply = (r: LoadResult) =>
@@ -142,10 +144,21 @@ export function ImportPanel() {
           className="field min-h-28 font-mono"
           value={text}
           spellCheck={false}
-          maxLength={WEB_LIMITS.maxJianpuChars}
           placeholder="1=C 4/4 | 5 3 2 1 | 6. 5_ 3 - |"
+          aria-describedby={countId}
           onChange={(e) => setText(e.target.value)}
         />
+        {/* No maxLength: a long paste is never truncated silently; the parser reports TEXT_TOO_LONG. */}
+        <p
+          id={countId}
+          data-testid="jianpu-count"
+          className={`text-xs ${overLimit ? 'font-medium text-danger-text' : 'text-muted-text'}`}
+          {...(overLimit ? { role: 'alert' } : {})}
+        >
+          {text.length.toLocaleString('zh-CN')} /{' '}
+          {WEB_LIMITS.maxJianpuChars.toLocaleString('zh-CN')} 字符
+          {overLimit && '：超过上限，分析时会报 TEXT_TOO_LONG，文本不会被截断。'}
+        </p>
         <p className="text-xs text-muted-text">
           语法：<code>1=调</code>、拍号、<code>♩=速度</code>，<code>'</code>/<code>,</code>{' '}
           高/低八度，

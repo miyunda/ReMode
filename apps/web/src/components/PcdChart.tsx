@@ -15,7 +15,7 @@ export function PcdChart({
 }: {
   pcd: PitchClassDistribution;
   ppq: number;
-  /** Pitch classes of the selected collection. */
+  /** Pitch classes of any selected collection (their union). */
   inSet: ReadonlySet<number>;
 }) {
   const id = useId();
@@ -101,7 +101,7 @@ export function PcdChart({
         })}
       </svg>
       <figcaption className="text-xs text-muted-text">
-        纵轴：累计时值（拍）。实心 = 所选音集内的音级；斜线 = 音集外。
+        纵轴：累计时值（拍）。实心 = 属于任一所选音集（候选来源）的音级；斜线 = 不属于任何所选音集。
       </figcaption>
       <details>
         <summary className="cursor-pointer text-xs font-medium">数据表</summary>
@@ -112,7 +112,7 @@ export function PcdChart({
                 <th scope="col">音级</th>
                 <th scope="col">时值（拍）</th>
                 <th scope="col">时值（tick）</th>
-                <th scope="col">在所选音集内</th>
+                <th scope="col">在任一所选音集内</th>
               </tr>
             </thead>
             <tbody>

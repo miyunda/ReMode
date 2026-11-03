@@ -1,10 +1,22 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { pitchClassName, type AccidentalPolicy } from '@remode/core';
 import { PITCH_CLASSES } from '../lib/modes';
 import { ambiguityReasonText } from '../lib/labels';
 import { sourceMode } from '../state/project';
 import { useDispatch, useProject } from '../state/ProjectContext';
 import { ModePicker } from './ModePicker';
+
+export const MAX_SEMITONES = 48;
+
+/**
+ * Semitone text → integer clamped to ±48, or null when it is not an integer.
+ * The field keeps its raw text so intermediate input such as "-" or "" survives.
+ */
+export function parseSemitones(text: string): number | null {
+  const t = text.trim().replace(/^[−–]/, '-');
+  if (!/^[+-]?\d+$/.test(t)) return null;
+  return Math.max(-MAX_SEMITONES, Math.min(MAX_SEMITONES, Number.parseInt(t, 10)));
+}
 
 const ACCIDENTALS: Array<{ id: AccidentalPolicy; label: string; hint: string }> = [
   { id: 'nearest', label: '就近映射（默认）', hint: '来源调式外的音移到相邻的目标音阶音。' },
@@ -28,12 +40,34 @@ export function TargetPanel() {
       : null;
   const accHint = ACCIDENTALS.find((a) => a.id === target.accidentals)?.hint;
 
+  // Raw text of the semitone field; parsed and clamped on blur and on generate.
+  const [semiText, setSemiText] = useState(String(target.semitones));
+  const [semiError, setSemiError] = useState<string | null>(null);
+  const [seenSemitones, setSeenSemitones] = useState(target.semitones);
+  if (seenSemitones !== target.semitones) {
+    setSeenSemitones(target.semitones);
+    if (parseSemitones(semiText) !== target.semitones) setSemiText(String(target.semitones));
+  }
+  /** Commit the field: the parsed value, or null (with a message) when the text is invalid. */
+  const commitSemitones = (): number | null => {
+    const n = parseSemitones(semiText);
+    if (n === null) {
+      setSemiError(`请输入 −${MAX_SEMITONES} 到 ${MAX_SEMITONES} 之间的整数（负数向下）。`);
+      return null;
+    }
+    setSemiError(null);
+    setSemiText(String(n));
+    if (n !== target.semitones) set({ semitones: n });
+    return n;
+  };
+
   return (
     <form
       className="flex flex-col gap-3"
       data-testid="target-panel"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!remode && commitSemitones() === null) return;
         dispatch({ type: 'GENERATE', createdAt: Date.now() });
       }}
     >
@@ -111,17 +145,26 @@ export function TargetPanel() {
           半音数（正数向上，负数向下）
           <input
             id={ids.semi}
-            type="number"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
             className="field w-32"
-            min={-48}
-            max={48}
-            step={1}
-            value={target.semitones}
+            value={semiText}
+            aria-invalid={semiError !== null}
+            aria-describedby={`${ids.semi}-msg`}
             onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              set({ semitones: Number.isFinite(n) ? Math.max(-48, Math.min(48, n)) : 0 });
+              setSemiText(e.target.value);
+              setSemiError(null);
             }}
+            onBlur={commitSemitones}
           />
+          <span
+            id={`${ids.semi}-msg`}
+            className={`text-xs font-normal ${semiError ? 'text-danger-text' : 'text-muted-text'}`}
+            role={semiError ? 'alert' : undefined}
+          >
+            {semiError ?? `范围 −${MAX_SEMITONES}…${MAX_SEMITONES}，超出时取边界值。`}
+          </span>
         </label>
       )}
 

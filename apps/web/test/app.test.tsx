@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App';
+import { WEB_LIMITS } from '../src/lib/limits';
 import { THEME_KEY } from '../src/lib/theme';
 import { fixtureBytes } from './helpers';
 
@@ -118,6 +119,75 @@ describe('workbench', () => {
     await user.click(screen.getByRole('checkbox', { name: /应用安全连奏修复/ }));
     expect(screen.getByTestId('repair-table')).toHaveTextContent('已应用的修改');
     expect(screen.getByText(/正在使用清理后来源/)).toBeInTheDocument();
+  });
+});
+
+describe('review fixes', () => {
+  it('typing -3 key by key transposes down and names the file down3', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:remode-test');
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const user = setup();
+    await loadExample(user);
+    await user.click(screen.getByRole('radio', { name: '移调' }));
+    const field = screen.getByLabelText(/半音数/);
+    await user.clear(field);
+    await user.type(field, '-');
+    expect(field).toHaveValue('-');
+    await user.type(field, '3');
+    expect(field).toHaveValue('-3');
+    await user.click(screen.getByRole('button', { name: '生成 Strict' }));
+    expect(screen.getByTestId('variant-summary')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /移调 -3 半音/ })).toBeInTheDocument();
+    const rows = within(screen.getByTestId('diff-table')).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('-3');
+    await user.click(screen.getByTestId('download'));
+    expect(screen.getByTestId('export-result')).toHaveTextContent('melody-transpose-down3.mid');
+  });
+
+  it('rejects non-integer semitones with a message and clamps to ±48 on blur', async () => {
+    const user = setup();
+    await loadExample(user);
+    await user.click(screen.getByRole('radio', { name: '移调' }));
+    const field = screen.getByLabelText(/半音数/);
+    await user.clear(field);
+    await user.type(field, '-');
+    await user.click(screen.getByRole('button', { name: '生成 Strict' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入');
+    expect(screen.queryByTestId('variant-summary')).not.toBeInTheDocument();
+    await user.clear(field);
+    await user.type(field, '-99');
+    await user.tab();
+    expect(field).toHaveValue('-48');
+  });
+
+  it('PCD marks the union of all selected collections; candidate warnings are labelled', async () => {
+    const user = setup();
+    const file = new File(
+      [fixtureBytes('chromatic-twelve-tone.mid') as Uint8Array<ArrayBuffer>],
+      'chromatic-twelve-tone.mid',
+    );
+    await user.upload(screen.getByTestId('file-input'), file);
+    const table = await screen.findByTestId('pcd-table');
+    const cells = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => r.lastElementChild?.textContent);
+    expect(cells).toEqual(Array(12).fill('是'));
+    const warnings = screen.getAllByTestId('candidate-warnings')[0]!;
+    expect(warnings).toHaveTextContent('OUT_OF_SET_NOTES');
+    expect(warnings).toHaveTextContent('含音集外的音');
+  });
+
+  it('never truncates a long jianpu paste; the parser reports TEXT_TOO_LONG', async () => {
+    const user = setup();
+    const long = '1=C 4/4 |' + ' 1'.repeat(WEB_LIMITS.maxJianpuChars / 2);
+    const area = screen.getByLabelText('简谱文本');
+    fireEvent.change(area, { target: { value: long } });
+    expect((area as HTMLTextAreaElement).value).toHaveLength(long.length);
+    expect(screen.getByTestId('jianpu-count')).toHaveTextContent('超过上限');
+    await user.click(screen.getByRole('button', { name: '分析简谱' }));
+    expect(screen.getByTestId('load-failure')).toHaveTextContent('TEXT_TOO_LONG');
   });
 });
 

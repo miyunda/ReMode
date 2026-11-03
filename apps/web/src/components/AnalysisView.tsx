@@ -7,7 +7,7 @@ import {
   type ModeCandidate,
 } from '@remode/core';
 import { beats } from '../lib/format';
-import { EVIDENCE_LABELS } from '../lib/labels';
+import { EVIDENCE_LABELS, codeLabel } from '../lib/labels';
 import { useProject } from '../state/ProjectContext';
 import { PcdChart } from './PcdChart';
 import { CodeChip, Issue, Section, TableScroll } from './ui';
@@ -77,9 +77,12 @@ function CandidateCard({ c, noteIndex }: { c: ModeCandidate; noteIndex: Map<stri
       )}
       <p className="text-xs text-muted-text">音集：{collectionLabel(c.collection)}</p>
       {c.warnings.length > 0 && (
-        <ul className="text-xs text-warn-text">
+        <ul className="flex flex-wrap gap-2 text-xs" data-testid="candidate-warnings">
           {c.warnings.map((w, i) => (
-            <li key={i}>! {w}</li>
+            <li key={i} className="flex items-center gap-1 text-warn-text">
+              <span aria-hidden="true">!</span>
+              <CodeChip code={w} /> {codeLabel(w)}
+            </li>
           ))}
         </ul>
       )}
@@ -146,9 +149,12 @@ export function AnalysisView() {
     );
   }
   const ppq = original.metadata.ppq;
-  const selected = analysis.selectedCollections[0];
+  // Union of every selected collection (candidates may come from several, e.g. a
+  // chromatic melody where all twelve diatonic transpositions tie).
   const inSet = new Set(
-    selected ? collectionPitchClasses(selected.collectionId, selected.transposition) : [],
+    analysis.selectedCollections.flatMap((s) =>
+      collectionPitchClasses(s.collectionId, s.transposition),
+    ),
   );
 
   return (

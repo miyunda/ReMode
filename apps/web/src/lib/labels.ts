@@ -29,7 +29,7 @@ const LABELS: Readonly<Record<string, string>> = {
   // MIDI import warnings
   DEFAULT_TEMPO: '缺少速度，按 120 BPM',
   DEFAULT_TIME_SIGNATURE: '缺少拍号，按 4/4',
-  INVALID_TIME_SIGNATURE: '忽略了无效拍号',
+  INVALID_TIME_SIGNATURE: '拍号无效',
   TRACK_COUNT_MISMATCH: '轨道数与文件头不符',
   TRAILING_BYTES: '文件尾部有多余字节',
   TYPE0_SPLIT_BY_CHANNEL: 'Type 0 文件按通道拆分为多条轨',
@@ -67,7 +67,11 @@ const LABELS: Readonly<Record<string, string>> = {
   DEFAULT_KEY: '缺少调号，按 1=C',
   BAR_DURATION_MISMATCH: '小节时值与拍号不符',
   KEY_SIGNATURE_RESPELLED: '调号按等音改写',
-  // Analysis
+  // Analysis: candidate warnings
+  BELOW_COVERAGE_THRESHOLD: '音集覆盖未达阈值',
+  OUT_OF_SET_NOTES: '含音集外的音',
+  NOT_FINAL_NOTE: '尾音不是此主音',
+  // Analysis: ambiguities
   MISSING_DEGREES: '缺少音级',
   MULTIPLE_COLLECTIONS: '多个音集同样兼容',
   TONIC_UNCLEAR: '主音不明确',
@@ -91,7 +95,6 @@ const LABELS: Readonly<Record<string, string>> = {
   REPETITION_INTRODUCED: '产生了同音重复',
   // Export
   INVALID_PPQ: 'PPQ 无效',
-  INVALID_TIME_SIGNATURE_EXPORT: '拍号无效',
   INVALID_KEY_SIGNATURE: '调号无效',
   INVALID_CHANNEL: '通道无效',
   INVALID_PROGRAM: '音色号无效',
