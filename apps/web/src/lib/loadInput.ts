@@ -12,7 +12,7 @@ import {
 } from '@remode/core';
 import { WEB_LIMITS, formatBytes, type WebLimits } from './limits';
 
-export type InputKind = 'midi' | 'jianpu';
+export type InputKind = 'midi' | 'jianpu' | 'new';
 
 export type LoadedInput =
   | {
@@ -29,6 +29,13 @@ export type LoadedInput =
       fileName: string | null;
       text: string;
       melody: JianpuMelody;
+    }
+  | {
+      /** A melody drawn in new-melody mode (spec §10.3); it becomes the Original. */
+      kind: 'new';
+      fileName: null;
+      melody: Pick<JianpuMelody, 'notes' | 'metadata' | 'warnings'>;
+      keyPitchClass: number;
     };
 
 export interface LoadIssue {
