@@ -11,6 +11,10 @@
     // Unknown paths get /index.html with 200 (client-side routing).
     "not_found_handling": "single-page-application",
   },
+  // Serve on <name>.<subdomain>.workers.dev and give previews/versions their own
+  // URLs. Explicit because both otherwise follow whatever the dashboard last set.
+  "workers_dev": true,
+  "preview_urls": true,
   // Required by `wrangler preview` (the Workers Builds Preview command for
   // non-production branches). Empty: a Preview uses the top-level settings;
   // assets and compatibility settings must stay at the top level.

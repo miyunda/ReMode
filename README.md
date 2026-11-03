@@ -241,7 +241,7 @@ anywhere. The piano roll and playback areas are labelled placeholders.
 
 The site is deployed as an **assets-only Cloudflare Worker** (ADR-017). The root
 [`wrangler.jsonc`](wrangler.jsonc) declares only `assets` (`./apps/web/dist`, with
-`not_found_handling: "single-page-application"`) plus an empty `previews` block. There is no `main` script, no bindings
+`not_found_handling: "single-page-application"`) plus `workers_dev: true`, `preview_urls: true` and an empty `previews` block. There is no `main` script, no bindings
 and no secrets. v1 has no server-side code; adding any later needs a new ADR (CLAUDE.md rule
 7). `wrangler` is a pinned root devDependency, so the build never downloads an unpinned
 copy.
@@ -273,7 +273,8 @@ How the build environment is chosen (Workers Builds docs):
   wrangler (Worker Previews need ≥ 4.135.0). It requires a `previews` block in
   `wrangler.jsonc`, even an empty one (`"previews": {}`). Assets and compatibility settings
   stay at the top level. Each branch gets a Preview URL of the form
-  `<branch>-remode.<subdomain>.workers.dev`. If the beta misbehaves, set the Preview
+  `<branch>-remode.<subdomain>.workers.dev`. `preview_urls` is set explicitly: otherwise it
+  follows the `workers_dev` setting, and a Worker that has never been deployed gets no Preview URL. If the beta misbehaves, set the Preview
   command to the stable `pnpm exec wrangler versions upload`. That uploads a version with a
   Version URL instead of a per-branch Preview URL, and needs no `previews` block.
 - Build variables are build-time only and invisible at runtime. Runtime variables and
