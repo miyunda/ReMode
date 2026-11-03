@@ -486,12 +486,30 @@ const pitchClass = mod(relative, 12);
 - 若输出同音大量重复或破坏明显旋律方向，显示诊断提示，留给方案 B。
 - 不更改音符时值。
 
+#### 7.3.1 M1b 实现约定（`remode-strict/1.0.0`，`packages/core/src/transform/scaleMapping.ts`）
+
+- **音级身份与八度**：`relative = pitch - root`，`octave = floor(relative / 12)`，按 `mod(relative, 12)` 查来源音级身份，再取目标同号音级的音程，输出 `root + 12·octave + 目标音程`。低于主音的音（`relative < 0`）用同一公式。
+- **映射规则对所有规模一致**：目标有同号音级 → 直接映射（`DEGREE_MAPPED`，不论升降）；目标没有 → 邻音（`SCALE_CONSTRAINT`）。7→7、5→7、6→7 因此完全确定。**5→5 只有在两种五声调式音级号相同时才完全确定**：五声五调的音级号并不相同（宫 1 2 3 5 6、商 1 2 4 5 ♭7、角 1 ♭3 4 ♭6 ♭7、徵 1 2 4 5 6、羽 1 ♭3 4 5 ♭7），例如宫→羽中 1、3、5 按身份映射（3→♭3），2 与 6 走邻音规则。不按序数映射（ADR：按音级身份）。
+- **邻音规则**（缺失音级与 `nearest` 调外音共用）：候选为目标音阶中紧邻原音高的下方与上方音。依次比较：
+  1. **与下一音方向一致**：原曲中本音到下一音（按时间顺序）的进行方向（上行 / 下行 / 同音），与候选音到“下一音的输出音高”的方向相同者优先；Strict 按时间倒序处理，所以下一音的输出已经确定。同音反复的音因此得到同一结果。
+  2. 距离最近；
+  3. 平局时靠近主音（到任一八度主音的距离较小）；
+  4. 仍然平局取下方。
+  现有音阶库中缺失音级总是落在小三度空隙里，所以距离平局只出现在调外音上。
+- **调外音策略**：`nearest`（默认）/ `preserve` / `reject`。`preserve` 仅当目标未声明严格（`strictTarget: false`）时允许，否则返回结构化错误 `PRESERVE_REQUIRES_LOOSE_TARGET`；`reject` 返回 `ACCIDENTAL_REJECTED` 并列出音符 ID。调外音如果本身已在目标音阶中，`nearest` 保留它。CLI 的 `--accidentals preserve` 自动把目标声明为非严格。
+- **原因码**：`DEGREE_MAPPED`、`SCALE_CONSTRAINT`、`ACCIDENTAL_NEAREST`、`RANGE_ADJUSTMENT`（只因音域整体移位而改变）、`TRANSPOSE`（移调）。每个改变的音恰有一条 `PitchChange`，`explanation` 给出音级、候选与所用规则。
+- **特征音曝光**：“有差别的音级” = 两调式中音程不同、或只有一方拥有的音级号（例如宫五声 → Lydian 为 ♯4、7，目标新增）。若来源旋律的调内音一个也没有用到其中来源拥有的音级，给 `NO_CHARACTERISTIC_DEGREE`，带 `degrees` 列表，并说明输出是否与原曲相同（调外音或音域可能仍有改动）。
+- **诊断**（只提示，不修改）：`CONTOUR_REVERSED`（任何一处相邻进行上下反转）；`REPETITION_INTRODUCED`（原有进行变成同音的步数 ≥ 2 且 ≥ 全部步数的 10%，阈值随变换设置记录）。
+- **换主音且换调式**：`strictRemodeWithTonic` = 半音移调（默认取 −5…+6 中较小的移动）+ 同主音 Strict，结果中 `steps` 分两步列出；最终变体的 `changes` 对比原曲与最终结果。
+- **结果**：`MelodyVariant`（`id: 'strict'`），`transform` 记录来源/目标、调外音策略、是否严格、软音域、整体移位与诊断阈值以及 `version`；另附报告（音级表、特征音曝光、轮廓诊断、音域）。分析器回检（§8.6）由独立函数 `recheckTarget` 提供：目标作为 rank-1 候选（主名称或同音集同主音的别名）即为“识别”。
+
 ### 7.4 音域控制
 
 - MIDI 合法范围：0–127。
 - 默认钢琴音域软限制：21–108（A0–C8），由用户可选关闭。
 - 先寻找适用于全曲的整八度移位 `12k`，同时满足期望音域且尽量接近原曲中心音区。
 - 若全曲无法通过单个八度偏移落入限制，提示用户；局部八度折叠只能作为明确选择的附加策略，且必须在差异报告标明。
+- **M1b 实现**（`transform/range.ts`）：在满足范围的 k 中取输出音域中点最接近参照中心的一个（Strict 的参照为原曲音域中点，移调为移调后的音域中点；再平局取 |k| 小、再取 k 小）。软限制无解时退而只满足 0–127 并警告 `RANGE_NO_FIT`；连 0–127 也无解为错误 `PITCH_OUT_OF_RANGE`。关闭软限制时不做任何移位，超出 0–127 即为错误。移位非零时警告 `RANGE_SHIFTED`，受影响的音在 diff 中标明。尚未实现局部八度折叠。
 
 ---
 
@@ -834,14 +852,14 @@ Invariant G:
 
 > 拆为两个 PR：**M1a** 只做输入/输出（简谱解析、MIDI 导出、round-trip、CLI `analyze` 简谱输入与 `export`），不做任何音高变换；**M1b** 做 Strict 换调式与移调。
 
-- [ ] 同主音换调式（默认）：按音级身份映射，7→7、5→5、5→7、7→5 与可配置调外音策略。
-- [ ] Chromatic Transpose，正确处理负音程和八度。
-- [ ] 特征音曝光检查（`NO_CHARACTERISTIC_DEGREE`）。
+- [x] 同主音换调式（默认）：按音级身份映射，7→7、5→5、5→7、7→5 与可配置调外音策略。（M1b，见 7.3.1）
+- [x] Chromatic Transpose，正确处理负音程和八度。（M1b）
+- [x] 特征音曝光检查（`NO_CHARACTERISTIC_DEGREE`）。（M1b）
 - [x] 简谱文本解析器（10.8 子集）；CLI 与 fixture 支持简谱输入。（M1a）
 - [x] 导出 MIDI；保留 Tick、Tempo、拍号、力度等支持的数据；按 11.1 写调号。（M1a）
-- [ ] 音域软限制与导出前冲突提示。
-- [ ] CLI：`analyze`、`transpose`、`remode --strategy strict`，均支持 `.mid` 与简谱文本。
-- [ ] Round-trip fixture 测试；分析器回检断言。（M1a 已完成 round-trip；回检随 M1b）
+- [x] 音域软限制与导出前冲突提示。（M1b：整八度移位，`RANGE_SHIFTED` / `RANGE_NO_FIT` / `PITCH_OUT_OF_RANGE`）
+- [x] CLI：`analyze`、`transpose`、`remode --strategy strict`，均支持 `.mid` 与简谱文本。（CLI 0.4.0；`remode` 需 `--to`，`--strategy` 可省略）
+- [x] Round-trip fixture 测试；分析器回检断言。（M1a round-trip；M1b 回检与 Strict 输出 round-trip）
 
 **DoD**：针对核心 fixture 生成正确 Strict MIDI；只改音高的不变量全部通过。
 

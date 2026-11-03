@@ -3,16 +3,17 @@
 > **Same Melody. Different Mood.**
 
 ReMode is a local-first melody mode lab. You import a monophonic melody, it identifies the
-mode (church modes and Chinese 五声 / 六声 / 七声 modes), and later milestones will rewrite
-the melody into another mode, play the versions side by side, and export MIDI. Everything
+mode (church modes and Chinese 五声 / 六声 / 七声 modes), rewrites the melody into another
+mode, and exports MIDI; later milestones add side-by-side playback in the browser. Everything
 runs in the browser. There is no backend and no AI.
 
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M1a (input/output).** M0 added MIDI import, monophony validation and
-mode analysis. M1a adds jianpu (numbered notation) input and MIDI export, all from the
-command line. Mode transforms come in M1b and the web UI in M2.
+**Status: milestone M1b (strict transforms).** M0 added MIDI import, monophony validation
+and mode analysis. M1a added jianpu (numbered notation) input and MIDI export. M1b adds
+chromatic transpose and the strict parallel remode (same tonic, new mode), all from the
+command line. The web UI comes in M2 and the Expressive optimiser in M3.
 
 ## Repository layout
 
@@ -50,9 +51,12 @@ node tools/cli/dist/main.js analyze <file.mid|file.jianpu|file.txt> [--track <id
 node tools/cli/dist/main.js analyze --jianpu "<jianpu text>" [--compact]
 node tools/cli/dist/main.js export <file.jianpu|file.txt> [-o <out.mid>] [--compact]
 node tools/cli/dist/main.js export --jianpu "<jianpu text>" [-o <out.mid>] [--compact]
+node tools/cli/dist/main.js transpose <input> --semitones <n> [--no-range] [-o <out.mid>]
+node tools/cli/dist/main.js remode <input> --to [<root>:]<scaleId> [--from <root>:<scaleId>] \
+    [--accidentals nearest|preserve|reject] [--strategy strict] [--no-range] [-o <out.mid>]
 ```
 
-Both commands take their input the same way: either a positional file or inline jianpu text
+All commands take their input the same way: either a positional file or inline jianpu text
 with `--jianpu "<text>"` (always text, never a path). Giving both, or neither, is a usage
 error. A file's format follows its extension: `.jianpu` and `.txt` are read as UTF-8 jianpu
 text, and anything else (`.mid`, `.midi`) as a Standard MIDI File.
@@ -85,7 +89,46 @@ ReMode never outputs a percentage or a confidence value.
 key signature implied by `1=X` (X major) are written as parsed. Without `-o` the file goes to
 the current directory as `<source>-original.mid` (`melody-original.mid` for `--jianpu` text).
 The JSON report lists the output file and any export warnings. MIDI input is rejected with a
-usage error (exit code 1) until transforms exist in M1b, because there is nothing to convert.
+usage error (exit code 1), because there is nothing to convert; use `transpose` or `remode`.
+
+`transpose` adds `n` semitones to every note (`--semitones -3` and `--semitones=-3` both
+work). IDs, ticks, durations and velocities are kept. Source key signatures are omitted
+(warning `KEY_SIGNATURES_OMITTED`) unless `n` is a multiple of 12. The default output name
+is `<source>-transpose-up<n>.mid` or `-down<n>.mid`.
+
+`remode` is the strict parallel remode (spec §7.3): the tonic stays and every note moves to
+the target's degree with the same number (by degree identity, never by position in the
+scale), in the same octave. Timing is never changed.
+
+- The source mode is the rank-1 analysis candidate. If the analysis is ambiguous at rank 1
+  (several rank-1 modes, `TONIC_UNCLEAR`, `MULTIPLE_COLLECTIONS`, `CHROMATIC_HEAVY` or
+  `TOO_SHORT`), the command stops with exit code 6 and asks for `--from <root>:<scaleId>`
+  (for example `--from C:ionian` or `--from A:pentatonic-yu`). `MISSING_DEGREES` alone does
+  not stop it, because the rank-1 candidate is then the smaller collection (e.g. 五声).
+- `--to` takes a scale id (`dorian`, `lydian`, `pentatonic-yu`, `qingyue-gong`, …). With a
+  root (`--to A:dorian`) the tonic changes too: the report shows two `steps`, a transpose
+  (the smaller move, −5 to +6 semitones) and then the parallel remode.
+- A degree the target lacks (a 偏音 going into 五声, for example) goes to the upper or lower
+  target neighbour: first the one that keeps the direction of the step to the next note,
+  then the nearer one, then the one nearer the tonic. These notes carry `SCALE_CONSTRAINT`.
+- Notes outside the source scale follow `--accidentals`: `nearest` (default, same neighbour
+  rule, `ACCIDENTAL_NEAREST`), `preserve` (kept as they are; the target is then not strict)
+  or `reject` (exit code 7, nothing written).
+- The whole result is shifted by whole octaves only if it leaves the soft range 21–108
+  (`RANGE_SHIFTED`, `RANGE_NO_FIT`). `--no-range` turns this off; pitches outside MIDI 0–127
+  are then an error.
+
+The `remode` report adds `sourceAnalysis`, `sourceMode` (`via` `analysis` or `option`),
+`targetMode`, `transform` (all settings and `remode-strict/1.0.0`), `steps` (tonic change
+only), `summary`, `diff` (every changed note with `from`/`to`, `reasonCode` and an
+explanation), `warnings`, `diagnostics` (degree table, characteristic-degree exposure,
+contour, range), `recheck` and the `output`/`export` sections. Warnings include
+`NO_CHARACTERISTIC_DEGREE` (the melody never sounds a degree that differs between the two
+modes, so the output equals the input), `CONTOUR_REVERSED` and `REPETITION_INTRODUCED`
+(diagnostics for M3). `recheck` runs the analyzer on the output and says whether the target
+is a rank-1 candidate. It is a diagnostic, and “not recognised” is a valid answer. The MIDI
+file carries the target's key signature and a `ReMode mode: …` text event, and the default
+name is `<source>-<root>-<scaleId>-strict.mid`.
 
 | Exit code | Meaning |
 |---|---|
@@ -94,7 +137,9 @@ usage error (exit code 1) until transforms exist in M1b, because there is nothin
 | 2 | Track selection needed (`TRACK_SELECTION_REQUIRED`, `NO_MELODIC_TRACK`, `TRACK_NOT_FOUND`) |
 | 3 | The input could not be imported or parsed (`NOT_MIDI`, `TRUNCATED`, `UNSUPPORTED_TUPLET`, …) |
 | 4 | The selected track is not a usable monophonic melody (see `validation`) |
-| 5 | The MIDI file could not be encoded (`export`) |
+| 5 | The MIDI file could not be encoded |
+| 6 | `remode`: the source mode is ambiguous at rank 1; pass `--from` |
+| 7 | The transform failed (`ACCIDENTAL_REJECTED`, `PITCH_OUT_OF_RANGE`, …) |
 
 Example:
 
@@ -107,6 +152,15 @@ and `PHRASE_END` (1 个非末句中 1 个结束于 C). The analysis also reports
 “旋律未确立第 4、7 级，无法区分 C Ionian / C Mixolydian / C Lydian；同样无法区分的中国七声读法：…”, listing the 清乐/雅乐/燕乐 readings as well.
 Analysing `fixtures/generated/missing-degrees-cdega.jianpu`, the same melody in jianpu, gives
 the same analysis.
+
+Strict remode examples:
+
+```bash
+node tools/cli/dist/main.js remode fixtures/generated/mode-church-c-ionian.jianpu --to dorian
+# → mode-church-c-ionian-C-dorian-strict.mid; diff: E4→Eb4 ×3, B4→Bb4 ×2 (DEGREE_MAPPED)
+node tools/cli/dist/main.js remode fixtures/generated/missing-degrees-cdega.jianpu --from C:ionian --to lydian
+# → no changes; NO_CHARACTERISTIC_DEGREE (the melody has no 4th degree), recheck.recognised = false
+```
 
 ## Jianpu
 
