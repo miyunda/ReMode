@@ -1,0 +1,29 @@
+// Cloudflare Workers static-assets project (ADR-017). Assets only: there is no
+// `main` script, no bindings and no secrets (CLAUDE.md rule 7). Workers Builds
+// runs `pnpm run build` and then deploys `apps/web/dist`.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "remode",
+  // Must not be later than the workerd bundled with the pinned wrangler.
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./apps/web/dist",
+    // Unknown paths get /index.html with 200 (client-side routing).
+    "not_found_handling": "single-page-application",
+  },
+  // Production custom domain (temporary; the final domain is undecided). This list
+  // is authoritative: when it names custom domains, `wrangler deploy` replaces the
+  // Worker's custom-domain set with it, so a domain added only in the dashboard
+  // would be removed. Change the domain here first. Previews never use routes.
+  "routes": [{ "pattern": "remode.miyunda.com", "custom_domain": true }],
+  // Serve on <name>.<subdomain>.workers.dev and give previews/versions their own
+  // URLs. Explicit because both otherwise follow whatever the dashboard last set
+  // (and workers_dev defaults to false once `routes` is present). Candidate to
+  // switch off once the custom domain is final.
+  "workers_dev": true,
+  "preview_urls": true,
+  // Required by `wrangler preview` (the Workers Builds Preview command for
+  // non-production branches). Empty: a Preview uses the top-level settings;
+  // assets and compatibility settings must stay at the top level.
+  "previews": {},
+}

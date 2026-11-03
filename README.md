@@ -10,10 +10,12 @@ runs in the browser. There is no backend and no AI.
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M1b (strict transforms).** M0 added MIDI import, monophony validation
-and mode analysis. M1a added jianpu (numbered notation) input and MIDI export. M1b adds
-chromatic transpose and the strict parallel remode (same tonic, new mode), all from the
-command line. The web UI comes in M2 and the Expressive optimiser in M3.
+**Status: milestone M2a (web import and analysis).** M0 added MIDI import, monophony
+validation and mode analysis. M1a added jianpu (numbered notation) input and MIDI export.
+M1b added chromatic transpose and the strict parallel remode (same tonic, new mode). M2a adds
+the browser workbench: import, analysis, source-mode correction, Strict generation, a
+per-note diff and MIDI download. The piano roll (M2b), playback (M2c) and the Expressive
+optimiser (M3) come later.
 
 ## Repository layout
 
@@ -23,7 +25,7 @@ command line. The web UI comes in M2 and the Expressive optimiser in M3.
 | `tools/cli` | `@remode/cli`: the `remode` command. |
 | `tools/fixtures` | Deterministic fixture generator (MIDI and jianpu text), which writes to `fixtures/generated/`. |
 | `fixtures/generated` | Committed `.mid` and `.jianpu` fixtures and `manifest.json` (description and expected behaviour of each fixture). |
-| `apps/web` | Placeholder for the M2 browser workbench. |
+| `apps/web` | `@remode/web`: the browser workbench (React + Vite + Tailwind), a static site that runs `@remode/core` locally. |
 
 ## Setup
 
@@ -37,6 +39,7 @@ pnpm lint        # ESLint + Prettier check
 pnpm test
 pnpm build
 pnpm smoke       # runs the built CLI once
+pnpm e2e         # Playwright against the built web app (see "Web workbench")
 ```
 
 After changing `tools/fixtures/src/catalog.ts`, regenerate the fixtures with
@@ -193,6 +196,128 @@ accidentals, double dots, thirty-seconds and mid-piece key, tempo or time change
 rejected with a structured error (`code`, `line`, `column`). Every note gets velocity 96/127
 and a stable ID `jianpu:n<k>`. The full rules are in spec §10.8.1.
 
+## Web workbench
+
+`apps/web` is a static single-page app. Every step (parsing, validation, analysis, Strict
+generation, export) runs in the browser through `@remode/core`.
+
+**Privacy.** Files and jianpu text are read and processed only in your browser. Nothing is
+uploaded, nothing is stored (only the theme choice is saved, in `localStorage`), and the
+app makes no network requests after its own static files have loaded. The E2E suite checks
+this, and the Content Security Policy (`connect-src 'self'`, self-only scripts and styles,
+no external fonts) enforces it.
+
+```bash
+pnpm dev                              # Vite dev server (http://localhost:5173)
+pnpm build                            # builds every package; the site goes to apps/web/dist
+pnpm preview                          # serves apps/web/dist with the production headers (CSP)
+pnpm --filter @remode/web exec playwright install --with-deps chromium   # once per machine
+pnpm e2e                              # builds the site, then runs the Playwright suite
+pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2a/
+```
+
+What M2a does: import `.mid` / `.midi` / `.jianpu` / `.txt` (drag-and-drop or picker) or
+type jianpu text; choose a track when a file has several melody candidates (each track shows
+its note count, range and whether it looks polyphonic); see the validation report in Chinese
+with its structured codes, and opt into the safe legato repair after seeing what it changes;
+see the analysis (candidates ranked by named tonic evidence, compatible collections, unused
+degrees, out-of-set notes, ambiguity codes, a pitch-class chart with a data table, and
+`analysisVersion`); set the source mode by hand (church modes by root, Chinese modes as
+宫系统 + 主音), which overrides detection and is marked as manual; generate a Strict parallel
+remode or a transpose; and download the result as MIDI. No percentage or confidence is shown
+anywhere. The piano roll and playback areas are labelled placeholders.
+
+**Limits** (initial values; measurements in
+[`docs/decisions/m2a-implementation-notes.md`](docs/decisions/m2a-implementation-notes.md)):
+
+| Limit | Value | Error code |
+|---|---|---|
+| File size (checked before reading) | 1 MiB | `FILE_TOO_LARGE` |
+| Notes in a MIDI file, all tracks | 20 000 | `TOO_MANY_NOTES` |
+| Notes in the melody being processed (selected track or jianpu) | 5 000 | `MELODY_TOO_LONG` / `TOO_MANY_NOTES` |
+| Jianpu text | 100 000 characters | `TEXT_TOO_LONG` |
+
+### Deploying to Cloudflare (Workers static assets)
+
+The site is deployed as an **assets-only Cloudflare Worker** (ADR-017). The root
+[`wrangler.jsonc`](wrangler.jsonc) declares only `assets` (`./apps/web/dist`, with
+`not_found_handling: "single-page-application"`), the production custom domain, `workers_dev`
+/ `preview_urls`, and an empty `previews` block. There is no `main` script, no bindings and
+no secrets. v1 has no server-side code; adding any later needs a new ADR (CLAUDE.md rule
+7). `wrangler` is a pinned root devDependency, so the build never downloads an unpinned
+copy.
+
+In the Cloudflare dashboard go to **Workers & Pages → Create → Workers → Import a
+repository**, choose `miyunda/ReMode`, and fill in:
+
+| Field | Value |
+|---|---|
+| Project name | `remode` (must equal `name` in `wrangler.jsonc`) |
+| Build command | `pnpm run build` |
+| Deploy command | `pnpm exec wrangler deploy` |
+| Preview command (non-production branches) | `pnpm exec wrangler preview` |
+| Enable Preview builds | On |
+| Protect with Cloudflare Access | Off (public site), unless you want previews private |
+| Root directory (advanced) | `/` (the repository root, where `wrangler.jsonc` is) |
+| Production branch (Settings → Build → Branch control) | `main` |
+| Build variables (Settings → Build → Build variables and secrets) | none required |
+
+How the build environment is chosen (Workers Builds docs):
+
+- **Node.js** comes from the committed `.node-version` (`24`). The image default is also 24.
+- **pnpm** runs through Corepack and follows `packageManager` in `package.json`
+  (`pnpm@12.16.1`). That field takes precedence over a `PNPM_VERSION` build variable, so none
+  is needed. Bumping pnpm means changing `packageManager`, nothing else.
+- Dependencies are installed automatically with pnpm because `pnpm-lock.yaml` is at the root.
+- `wrangler deploy` / `wrangler preview` use the wrangler version from `package.json`.
+- **Preview builds** run `pnpm exec wrangler preview`, which is an open beta in the pinned
+  wrangler (Worker Previews need ≥ 4.135.0). It requires a `previews` block in
+  `wrangler.jsonc`, even an empty one (`"previews": {}`). Assets and compatibility settings
+  stay at the top level. Each branch gets a Preview URL of the form
+  `<branch>-remode.<subdomain>.workers.dev`. If the beta misbehaves, set the Preview
+  command to the stable `pnpm exec wrangler versions upload`. That uploads a version with a
+  Version URL instead of a per-branch Preview URL, and needs no `previews` block.
+- Build variables are build-time only and invisible at runtime. Runtime variables and
+  secrets (Settings → Variables & Secrets) stay empty in v1.
+
+**URLs**
+
+| Environment | URL | Source |
+|---|---|---|
+| Production (`main`) | <https://remode.miyunda.com> | `routes` in `wrangler.jsonc` (custom domain, zone `miyunda.com`) |
+| Production, workers.dev | <https://remode.contra-milord.workers.dev> | `workers_dev: true` |
+| Preview (each non-production branch) | `https://<branch>-remode.contra-milord.workers.dev`, e.g. <https://feat-m2a-web-import-analysis-remode.contra-milord.workers.dev> | `wrangler preview` |
+| Single version | a per-version URL on `contra-milord.workers.dev` | `preview_urls: true` |
+
+- `remode.miyunda.com` is **temporary**. The final production domain is not chosen or
+  registered yet. To move it later, add the new domain's zone to Cloudflare, change the
+  `routes` entry, and merge; then remove the old domain in the dashboard if it lingers.
+  `wrangler.jsonc` is the source of truth. Whenever `routes` lists custom domains,
+  `wrangler deploy` replaces the Worker's whole custom-domain set with that list (wrangler
+  4.151.2 sends `replace_state=true`). So a domain added only in the dashboard is removed on
+  the next production deploy: change the config first. Previews never use `routes`.
+- `workers_dev: true` keeps the production workers.dev URL. It is harmless, and a candidate
+  to switch off once the custom domain is final. Setting `routes` would otherwise turn it
+  off by default, and preview URLs follow it.
+- Preview URLs need a workers.dev subdomain on the account (`contra-milord`; **Workers &
+  Pages → Overview → Subdomain**) and Preview URLs enabled for the Worker (**remode →
+  Settings → Domains & Routes**). `wrangler.jsonc` sets `preview_urls: true`, but only
+  `wrangler deploy` applies it, so the dashboard toggle was needed before the first
+  production deploy.
+
+`apps/web/public/_headers` (CSP and the other security headers) is honoured by Workers
+static assets and is not itself served. `vite preview` sends the same headers, so the E2E
+suite runs under the production CSP. Unknown paths return `index.html` with 200.
+
+To check the deployment config locally without credentials (never deploy from a dev machine):
+
+```bash
+pnpm build
+pnpm exec wrangler deploy --dry-run   # reads wrangler.jsonc and the assets; uploads nothing
+pnpm exec wrangler dev                # serves apps/web/dist on workerd at http://localhost:8787
+E2E_BASE_URL=http://localhost:8787 pnpm --filter @remode/web exec playwright test --project=desktop
+```
+
 ## Supported input and limitations
 
 Supported: Standard MIDI Files of format 0 and 1 that use ticks-per-quarter-note timing.
@@ -202,8 +327,8 @@ Not supported:
 
 - **MIDI format 2** (independent sequences) is rejected with `UNSUPPORTED_FORMAT`.
 - **SMPTE time division** is rejected with `SMPTE_TIMING`.
-- Files over 4 MiB or with more than 20 000 notes are rejected. These are initial limits
-  and will be tuned after performance testing.
+- In the core API and the CLI, files over 4 MiB or with more than 20 000 notes are rejected.
+  The web app uses tighter limits (see "Web workbench"). These are initial limits.
 - Polyphonic tracks are not analysed. Same-tick chords and overlaps beyond the legato
   tolerance (min(15 ms, PPQ/16)) are reported as errors.
 - Percussion tracks (channel 10) are listed but never treated as melodies.

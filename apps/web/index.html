@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ReMode：单声部旋律的调式识别与改写，全部在浏览器本地完成。" />
+    <meta name="color-scheme" content="light dark" />
+    <title>ReMode</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Applies the saved theme before first paint; external so the CSP needs no inline script. -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>ReMode 需要启用 JavaScript；所有处理都在本地浏览器中完成。</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

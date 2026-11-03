@@ -9,10 +9,13 @@
   },
   "scripts": {
     "build": "pnpm -r run build",
+    "dev": "pnpm --filter @remode/web dev",
+    "preview": "pnpm --filter @remode/web preview",
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "pnpm -r run test",
+    "e2e": "pnpm --filter @remode/web e2e",
     "fixtures": "pnpm --filter @remode/fixtures run generate",
     "smoke": "node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.mid --compact > /dev/null && node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.jianpu --compact > /dev/null && node tools/cli/dist/main.js export fixtures/generated/mode-church-c-dorian.jianpu -o \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && node tools/cli/dist/main.js analyze \"${TMPDIR:-/tmp}/remode-smoke.mid\" --compact > /dev/null && node tools/cli/dist/main.js export --jianpu '1=C 4/4 | 1 2 3 4 |' -o \"${TMPDIR:-/tmp}/remode-smoke-inline.mid\" --compact > /dev/null && node tools/cli/dist/main.js transpose fixtures/generated/mode-church-c-dorian.mid --semitones -3 -o \"${TMPDIR:-/tmp}/remode-smoke-t.mid\" --compact > /dev/null && node tools/cli/dist/main.js remode fixtures/generated/mode-church-c-ionian.jianpu --to dorian -o \"${TMPDIR:-/tmp}/remode-smoke-r.mid\" --compact > /dev/null && node tools/cli/dist/main.js analyze \"${TMPDIR:-/tmp}/remode-smoke-r.mid\" --compact > /dev/null && echo smoke ok"
   },
@@ -21,12 +24,14 @@
     "@types/node": "26.6.6",
     "eslint": "10.14.0",
     "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vite": "8.3.5",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "wrangler": "4.151.2"
   }
 }

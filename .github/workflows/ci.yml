@@ -16,7 +16,7 @@ jobs:
       - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -25,3 +25,20 @@ jobs:
       - run: pnpm build
       - name: Smoke-test the built CLI (catches ESM/CJS interop that Vitest hides)
         run: pnpm smoke
+      - name: Validate the Workers static-assets config (no credentials, uploads nothing)
+        run: pnpm exec wrangler deploy --dry-run
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      # Browser E2E against the production build (vite preview with the Pages
+      # _headers CSP). Kept in `check` so branch protection needs no new job.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @remode/web exec playwright install --with-deps chromium
+      - name: E2E (Playwright)
+        run: pnpm e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
