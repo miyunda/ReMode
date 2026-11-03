@@ -105,6 +105,24 @@ describe('remode analyze', () => {
     expect(run('export', '--jianpu', '1 2 3', '--repair').code).toBe(EXIT.USAGE);
     expect(run('analyze', '--jianpu', '1 2 3', '-o', 'x.mid').code).toBe(EXIT.USAGE);
     expect(run('transpose', 'x.mid').code).toBe(EXIT.USAGE);
+    expect(run('transpose', '--jianpu', '1 2', '--semitones', '1.5').code).toBe(EXIT.USAGE);
+    expect(run('remode', '--jianpu', '1 2').code).toBe(EXIT.USAGE);
+    expect(run('remode', '--jianpu', '1 2', '--to', 'nope').code).toBe(EXIT.USAGE);
+    expect(run('remode', '--jianpu', '1 2', '--to', 'H:dorian').code).toBe(EXIT.USAGE);
+    expect(run('remode', '--jianpu', '1 2', '--to', 'dorian', '--from', 'ionian').code).toBe(
+      EXIT.USAGE,
+    );
+    expect(run('remode', '--jianpu', '1 2', '--to', 'dorian', '--accidentals', 'x').code).toBe(
+      EXIT.USAGE,
+    );
+    expect(
+      run('remode', '--jianpu', '1 2', '--to', 'dorian', '--strategy', 'expressive').code,
+    ).toBe(EXIT.USAGE);
+    expect(run('analyze', '--jianpu', '1 2', '--to', 'dorian').code).toBe(EXIT.USAGE);
+    expect(run('analyze', '--jianpu', '1 2', '--no-range').code).toBe(EXIT.USAGE);
+    expect(run('remode', '--jianpu', '1 2', '--to', 'dorian', '--semitones', '2').code).toBe(
+      EXIT.USAGE,
+    );
   });
 });
 
@@ -199,7 +217,7 @@ describe('remode export', () => {
   it('refuses MIDI input with a clear message', () => {
     const r = run('export', 'mode-church-c-dorian.mid', '-o', 'out.mid');
     expect(r.code).toBe(EXIT.USAGE);
-    expect(r.stderr).toMatch(/MIDI input has nothing to convert/);
+    expect(r.stderr).toMatch(/for MIDI input use transpose or remode/);
     expect(r.written.size).toBe(0);
   });
 
@@ -209,5 +227,223 @@ describe('remode export', () => {
     expect(r.code).toBe(EXIT.IMPORT_FAILED);
     expect(r.json.errors[0].code).toBe('UNSUPPORTED_REPEAT');
     expect(r.written.size).toBe(0);
+  });
+});
+
+describe('remode transpose', () => {
+  it('transposes MIDI by a negative interval and names the file after it', () => {
+    const r = run('transpose', 'mode-church-c-dorian.mid', '--semitones', '-3');
+    expect(r.code).toBe(EXIT.OK);
+    expect([...r.written.keys()]).toEqual(['mode-church-c-dorian-transpose-down3.mid']);
+    expect(r.json.remode.transformVersion).toBe('remode-transpose/1.0.0');
+    expect(r.json.transform).toMatchObject({
+      operation: 'transpose',
+      semitones: -3,
+      rangeShift: 0,
+    });
+    expect(r.json.summary).toEqual({ notes: 18, changed: 18 });
+    expect(r.json.diff[0]).toMatchObject({ from: 'C4', to: 'A3', reasonCode: 'TRANSPOSE' });
+    const back = importMidi(r.written.get('mode-church-c-dorian-transpose-down3.mid')!);
+    const src = importMidi(new Uint8Array(readFileSync(`${FIXTURES}mode-church-c-dorian.mid`)));
+    if (!back.ok || !src.ok) throw new Error();
+    expect(
+      back.midi.tracks[0]!.notes.map((n) => [n.pitch + 3, n.startTick, n.durationTick]),
+    ).toEqual(src.midi.tracks[0]!.notes.map((n) => [n.pitch, n.startTick, n.durationTick]));
+  });
+
+  it('omits source key signatures that no longer apply', () => {
+    const r = run('transpose', 'mode-church-c-dorian.jianpu', '--semitones=2', '-o', 'o.mid');
+    expect(r.code).toBe(EXIT.OK);
+    expect(r.json.warnings.map((w: { code: string }) => w.code)).toEqual([
+      'KEY_SIGNATURES_OMITTED',
+    ]);
+    expect(r.json.export.keySignature).toEqual({ policy: 'omit', written: [] });
+    const octave = run(
+      'transpose',
+      'mode-church-c-dorian.jianpu',
+      '--semitones',
+      '12',
+      '-o',
+      'o.mid',
+    );
+    expect(octave.json.export.keySignature.policy).toBe('source');
+  });
+
+  it('applies the soft range, or fails with --no-range', () => {
+    const shifted = run('transpose', '--jianpu', "1=C | 1'' 2'' |", '--semitones', '40');
+    expect(shifted.code).toBe(EXIT.OK);
+    expect(shifted.json.transform.rangeShift).toBe(-24); // 124..126 → 100..102
+    expect(shifted.json.warnings[0].code).toBe('RANGE_SHIFTED');
+    // 126 is still MIDI; 131 is not, and --no-range forbids shifting it back.
+    const legal = run(
+      'transpose',
+      '--jianpu',
+      "1=C | 1'' 2'' |",
+      '--semitones',
+      '40',
+      '--no-range',
+    );
+    expect(legal.json.transform.rangeShift).toBe(0);
+    const off = run('transpose', '--jianpu', "1=C | 1'' 2'' |", '--semitones', '45', '--no-range');
+    expect(off.code).toBe(EXIT.TRANSFORM_FAILED);
+    expect(off.json.errors[0].code).toBe('PITCH_OUT_OF_RANGE');
+    expect(off.written.size).toBe(0);
+  });
+});
+
+describe('remode remode', () => {
+  type Diff = { noteId: string; from: string; to: string; reasonCode: string };
+
+  it('C Ionian → C Dorian / Lydian / 羽 from the jianpu fixture', () => {
+    const dorian = run('remode', 'mode-church-c-ionian.jianpu', '--to', 'dorian');
+    expect(dorian.code).toBe(EXIT.OK);
+    expect([...dorian.written.keys()]).toEqual(['mode-church-c-ionian-C-dorian-strict.mid']);
+    expect(dorian.json.sourceMode).toMatchObject({ name: 'C Ionian', via: 'analysis' });
+    expect(dorian.json.targetMode).toMatchObject({ name: 'C Dorian' });
+    expect(dorian.json.diff.map((d: Diff) => `${d.from}→${d.to}`)).toEqual([
+      'E4→Eb4',
+      'E4→Eb4',
+      'B4→Bb4',
+      'B4→Bb4',
+      'E4→Eb4',
+    ]);
+    expect(dorian.json.recheck).toMatchObject({ recognised: true, matchedAs: 'primary' });
+    expect(dorian.json.export.keySignature).toMatchObject({
+      policy: 'mode',
+      written: [{ tick: 0, key: 'Bb', scale: 'major' }],
+      mode: { text: 'ReMode mode: C Dorian [dorian]' },
+    });
+
+    const lydian = run('remode', 'mode-church-c-ionian.jianpu', '--to', 'lydian');
+    expect(lydian.json.diff.map((d: Diff) => `${d.from}→${d.to}`)).toEqual(['F4→F#4', 'F4→F#4']);
+
+    const yu = run(
+      'remode',
+      'mode-church-c-ionian.jianpu',
+      '--to',
+      'pentatonic-yu',
+      '-o',
+      'yu.mid',
+    );
+    expect(yu.code).toBe(EXIT.OK);
+    expect(yu.json.targetMode.name).toBe('C 羽调式（Eb 宫系统，五声）');
+    expect(new Set(yu.json.diff.map((d: Diff) => d.reasonCode))).toEqual(
+      new Set(['DEGREE_MAPPED', 'SCALE_CONSTRAINT']),
+    );
+    expect(yu.json.warnings.map((w: { code: string }) => w.code)).toEqual([
+      'REPETITION_INTRODUCED',
+    ]);
+    const back = importMidi(yu.written.get('yu.mid')!);
+    expect(back.ok && back.midi.metadata.keySignatures).toEqual([
+      { tick: 0, key: 'Eb', scale: 'major' },
+    ]);
+  });
+
+  it('reports NO_CHARACTERISTIC_DEGREE and an honest re-check', () => {
+    const r = run('remode', 'missing-degrees-cdega.jianpu', '--from', 'C:ionian', '--to', 'lydian');
+    expect(r.code).toBe(EXIT.OK);
+    expect(r.json.sourceMode.via).toBe('option');
+    expect(r.json.sourceAnalysis.rank1).toEqual(['C 宫调式（C 宫系统，五声）']);
+    expect(r.json.diff).toEqual([]);
+    expect(r.json.warnings[0]).toMatchObject({
+      code: 'NO_CHARACTERISTIC_DEGREE',
+      degrees: ['4→♯4'],
+    });
+    expect(r.json.diagnostics.outputEqualsInput).toBe(true);
+    expect(r.json.recheck.recognised).toBe(false);
+  });
+
+  it('refuses an ambiguous source mode unless --from is given', () => {
+    const r = run('remode', 'tonic-unclear-pentatonic.mid', '--to', 'dorian');
+    expect(r.code).toBe(EXIT.SOURCE_MODE_AMBIGUOUS);
+    expect(r.json.errors[0].code).toBe('SOURCE_MODE_AMBIGUOUS');
+    expect(r.json.errors[0].message).toMatch(/TONIC_UNCLEAR.*--from/);
+    expect(r.written.size).toBe(0);
+    const ok = run(
+      'remode',
+      'tonic-unclear-pentatonic.mid',
+      '--to',
+      'dorian',
+      '--from',
+      'A:pentatonic-yu',
+    );
+    expect(ok.code).toBe(EXIT.OK);
+    const short = run('remode', '--jianpu', '1 2 3', '--to', 'dorian');
+    expect(short.code).toBe(EXIT.SOURCE_MODE_AMBIGUOUS);
+    expect(short.json.errors[0].message).toMatch(/TOO_SHORT/);
+  });
+
+  it('changes tonic and mode as two explicit steps', () => {
+    const r = run('remode', 'mode-church-c-ionian.jianpu', '--to', 'A:dorian');
+    expect(r.code).toBe(EXIT.OK);
+    expect([...r.written.keys()]).toEqual(['mode-church-c-ionian-A-dorian-strict.mid']);
+    expect(r.json.steps.map((s: { operation: string }) => s.operation)).toEqual([
+      'transpose',
+      'parallel-remode',
+    ]);
+    expect(r.json.transform.preTranspose).toEqual({ fromRoot: 0, semitones: -3 });
+    expect(r.json.recheck).toMatchObject({ recognised: true });
+  });
+
+  it('accidental policies: nearest, preserve, reject', () => {
+    const text = '1=C 4/4 | 1 #4 5 3 | 2 1 3 2 | 1 - - - |';
+    const nearest = run('remode', '--jianpu', text, '--from', 'C:ionian', '--to', 'dorian');
+    expect(
+      nearest.json.diff.filter((d: Diff) => d.reasonCode === 'ACCIDENTAL_NEAREST'),
+    ).toHaveLength(1);
+    const keep = run(
+      'remode',
+      '--jianpu',
+      text,
+      '--from',
+      'C:ionian',
+      '--to',
+      'dorian',
+      '--accidentals',
+      'preserve',
+    );
+    expect(keep.code).toBe(EXIT.OK);
+    expect(keep.json.transform.strictTarget).toBe(false);
+    expect(keep.json.warnings.map((w: { code: string }) => w.code)).toContain(
+      'ACCIDENTALS_PRESERVED',
+    );
+    const reject = run(
+      'remode',
+      '--jianpu',
+      text,
+      '--from',
+      'C:ionian',
+      '--to',
+      'dorian',
+      '--accidentals',
+      'reject',
+    );
+    expect(reject.code).toBe(EXIT.TRANSFORM_FAILED);
+    expect(reject.json.errors[0]).toMatchObject({
+      code: 'ACCIDENTAL_REJECTED',
+      noteIds: ['jianpu:n1'],
+    });
+    expect(reject.written.size).toBe(0);
+  });
+
+  it('works on MIDI input with --track and keeps timing', () => {
+    const r = run(
+      'remode',
+      'type0-multichannel.mid',
+      '--track',
+      '0',
+      '--to',
+      'aeolian',
+      '-o',
+      'a.mid',
+    );
+    expect(r.code).toBe(EXIT.OK);
+    expect(r.json.sourceMode.name).toBe('D Dorian');
+    expect(r.json.export.warnings.map((w: { code: string }) => w.code)).toContain('TRACKS_DROPPED');
+    const back = importMidi(r.written.get('a.mid')!);
+    if (!back.ok) throw new Error();
+    expect(
+      back.midi.tracks[0]!.notes.every((n) => [2, 4, 5, 7, 9, 10, 0].includes(n.pitch % 12)),
+    ).toBe(true);
   });
 });
