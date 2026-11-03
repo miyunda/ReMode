@@ -30,8 +30,8 @@
 ### 分支与发布流程
 
 - **不直接提交到 `main`**。`main` 是 Cloudflare Workers 的生产分支，受分支保护（含管理员）：只能通过 GitHub PR 合并更新。
-- 每个切片从最新的 `main` 拉出功能分支，命名为 `feat/...`（如 `feat/m1a-jianpu-export`）；没有长期的 `dev` 分支。推送后由 Cloudflare Workers Builds 自动生成预览构建（Preview URL）。
-- 预览站验收通过后，在 GitHub 上开 PR 合并到 `main`，合并后自动发布生产。
+- 每个切片从最新的 `main` 拉出功能分支，命名为 `feat/...`（如 `feat/m1a-jianpu-export`）；没有长期的 `dev` 分支。推送后由 Cloudflare Workers Builds 自动生成预览构建，地址为 `https://<branch>-remode.contra-milord.workers.dev`（另有按版本的 URL）。
+- 预览站验收通过后，在 GitHub 上开 PR 合并到 `main`，合并后自动发布生产：`https://remode.miyunda.com`（临时域名，正式域名尚未确定、未注册）。生产域名以 `wrangler.jsonc` 的 `routes`（`custom_domain: true`）为准，`wrangler deploy` 会用它替换 Worker 的全部自定义域名，所以换域名要先改配置，不要只在面板里改。
 - CI 的 `check` 任务（typecheck / lint / test / build / smoke / e2e）必须在 PR 上全绿才能合并。
 - 本地可用 `pnpm build && pnpm exec wrangler deploy --dry-run` 校验部署配置；不要从开发机直接部署，也不要在仓库或开发机上放 Cloudflare 凭据。
 

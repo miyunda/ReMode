@@ -241,8 +241,9 @@ anywhere. The piano roll and playback areas are labelled placeholders.
 
 The site is deployed as an **assets-only Cloudflare Worker** (ADR-017). The root
 [`wrangler.jsonc`](wrangler.jsonc) declares only `assets` (`./apps/web/dist`, with
-`not_found_handling: "single-page-application"`) plus `workers_dev: true`, `preview_urls: true` and an empty `previews` block. There is no `main` script, no bindings
-and no secrets. v1 has no server-side code; adding any later needs a new ADR (CLAUDE.md rule
+`not_found_handling: "single-page-application"`), the production custom domain, `workers_dev`
+/ `preview_urls`, and an empty `previews` block. There is no `main` script, no bindings and
+no secrets. v1 has no server-side code; adding any later needs a new ADR (CLAUDE.md rule
 7). `wrangler` is a pinned root devDependency, so the build never downloads an unpinned
 copy.
 
@@ -273,17 +274,36 @@ How the build environment is chosen (Workers Builds docs):
   wrangler (Worker Previews need ≥ 4.135.0). It requires a `previews` block in
   `wrangler.jsonc`, even an empty one (`"previews": {}`). Assets and compatibility settings
   stay at the top level. Each branch gets a Preview URL of the form
-  `<branch>-remode.<subdomain>.workers.dev`. `preview_urls` is set explicitly: otherwise it
-  follows the `workers_dev` setting, and a Worker that has never been deployed gets no Preview URL.
-- **Preview URLs also need the dashboard:** the account must have a workers.dev subdomain
-  (**Workers & Pages → Overview → Subdomain**), and preview URLs must be on for the Worker
-  (**remode → Settings → Domains & Routes → Preview URLs: Enable**). `wrangler.jsonc` sets
-  `workers_dev` / `preview_urls`, but only `wrangler deploy` (production) applies them. Until
-  the first successful production deploy, preview builds can succeed with "No Preview URL". If the beta misbehaves, set the Preview
+  `<branch>-remode.<subdomain>.workers.dev`. If the beta misbehaves, set the Preview
   command to the stable `pnpm exec wrangler versions upload`. That uploads a version with a
   Version URL instead of a per-branch Preview URL, and needs no `previews` block.
 - Build variables are build-time only and invisible at runtime. Runtime variables and
   secrets (Settings → Variables & Secrets) stay empty in v1.
+
+**URLs**
+
+| Environment | URL | Source |
+|---|---|---|
+| Production (`main`) | <https://remode.miyunda.com> | `routes` in `wrangler.jsonc` (custom domain, zone `miyunda.com`) |
+| Production, workers.dev | <https://remode.contra-milord.workers.dev> | `workers_dev: true` |
+| Preview (each non-production branch) | `https://<branch>-remode.contra-milord.workers.dev`, e.g. <https://feat-m2a-web-import-analysis-remode.contra-milord.workers.dev> | `wrangler preview` |
+| Single version | a per-version URL on `contra-milord.workers.dev` | `preview_urls: true` |
+
+- `remode.miyunda.com` is **temporary**. The final production domain is not chosen or
+  registered yet. To move it later, add the new domain's zone to Cloudflare, change the
+  `routes` entry, and merge; then remove the old domain in the dashboard if it lingers.
+  `wrangler.jsonc` is the source of truth. Whenever `routes` lists custom domains,
+  `wrangler deploy` replaces the Worker's whole custom-domain set with that list (wrangler
+  4.151.2 sends `replace_state=true`). So a domain added only in the dashboard is removed on
+  the next production deploy: change the config first. Previews never use `routes`.
+- `workers_dev: true` keeps the production workers.dev URL. It is harmless, and a candidate
+  to switch off once the custom domain is final. Setting `routes` would otherwise turn it
+  off by default, and preview URLs follow it.
+- Preview URLs need a workers.dev subdomain on the account (`contra-milord`; **Workers &
+  Pages → Overview → Subdomain**) and Preview URLs enabled for the Worker (**remode →
+  Settings → Domains & Routes**). `wrangler.jsonc` sets `preview_urls: true`, but only
+  `wrangler deploy` applies it, so the dashboard toggle was needed before the first
+  production deploy.
 
 `apps/web/public/_headers` (CSP and the other security headers) is honoured by Workers
 static assets and is not itself served. `vite preview` sends the same headers, so the E2E
