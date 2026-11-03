@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    // Type-check against core's sources so this works before core is built.
+    "customConditions": ["@remode/source"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

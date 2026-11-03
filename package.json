@@ -12,7 +12,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "pnpm -r run test",
-    "fixtures": "pnpm --filter @remode/fixtures run generate"
+    "fixtures": "pnpm --filter @remode/fixtures run generate",
+    "smoke": "node tools/cli/dist/main.js analyze fixtures/generated/mode-church-c-dorian.mid --compact > /dev/null && echo smoke ok"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
