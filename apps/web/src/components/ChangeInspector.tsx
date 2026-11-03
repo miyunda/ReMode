@@ -217,7 +217,6 @@ export function ChangeInspector() {
       {active.id === 'custom' && customRecheck && <Recheck recheck={customRecheck} />}
 
       <NoteTable
-        key={`${active.id}:${active.id === 'generated' ? String(g?.variant.createdAt) : ''}`}
         original={original.notes}
         notes={active.notes}
         changes={active.changes}

@@ -28,7 +28,7 @@ export function NoteTable({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const [all, setAll] = useState(changes.length === 0);
+  const [all, setAll] = useState(false);
   const [page, setPage] = useState(0);
   const filterId = useId();
   const byId = new Map(changes.map((c) => [c.noteId, c]));
@@ -88,7 +88,9 @@ export function NoteTable({
         )}
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-text">没有音被改变。</p>
+        <p className="text-sm text-muted-text">
+          {all ? '没有音符。' : '没有音被改变；勾选“显示全部音符”可查看每个音。'}
+        </p>
       ) : (
         <TableScroll label="音符表">
           <table className="data-table" data-testid="diff-table">

@@ -462,7 +462,8 @@ export function RollCanvas(props: RollCanvasProps) {
     for (let pitch = firstPitch; pitch >= lastPitch; pitch--) {
       const y = pitchToY(view, pitch);
       const black = [1, 3, 6, 8, 10].includes(pitchClass(pitch));
-      ctx.fillStyle = black ? p.text : p.base;
+      // Piano keys keep piano colours in both themes.
+      ctx.fillStyle = black ? '#26233a' : '#fffaf3';
       ctx.fillRect(GUTTER - 18, y, 18, rowH);
       ctx.strokeStyle = p.hlHigh;
       ctx.lineWidth = 1;
@@ -473,7 +474,7 @@ export function RollCanvas(props: RollCanvasProps) {
       }
       // Membership marks: ■ / 1 in the source column, □ / 1 in the target column.
       const cols = [
-        [scales.source, scales.showSource, GUTTER - 30, p.source, true],
+        [scales.source, scales.showSource, GUTTER - 32, p.source, true],
         [scales.target, scales.showTarget, GUTTER - 24, p.target, false],
       ] as const;
       for (const [m, show, x, colour, solid] of cols) {
