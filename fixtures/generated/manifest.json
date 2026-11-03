@@ -1,0 +1,848 @@
+{
+  "generator": "@remode/fixtures",
+  "fixtures": [
+    {
+      "file": "mode-church-c-ionian.mid",
+      "bytes": 215,
+      "description": "C Ionian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "ionian",
+            "name": "C Ionian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-dorian.mid",
+      "bytes": 215,
+      "description": "C Dorian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "dorian",
+            "name": "C Dorian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-phrygian.mid",
+      "bytes": 217,
+      "description": "C Phrygian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "phrygian",
+            "name": "C Phrygian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-lydian.mid",
+      "bytes": 215,
+      "description": "C Lydian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "lydian",
+            "name": "C Lydian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-mixolydian.mid",
+      "bytes": 219,
+      "description": "C Mixolydian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "mixolydian",
+            "name": "C Mixolydian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-aeolian.mid",
+      "bytes": 216,
+      "description": "C Aeolian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "aeolian",
+            "name": "C Aeolian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-church-c-locrian.mid",
+      "bytes": 216,
+      "description": "C Locrian: every degree used, both phrases cadence on C.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 480,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "locrian",
+            "name": "C Locrian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "CHROMATIC_HEAVY"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-gong.mid",
+      "bytes": 194,
+      "description": "C 宫系统五声, final C → C 宫调式. Same pitch set as the other four, different 结音.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "pentatonic-gong",
+            "name": "C 宫调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-shang.mid",
+      "bytes": 194,
+      "description": "C 宫系统五声, final D → D 商调式. Same pitch set as the other four, different 结音.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "D",
+            "scaleId": "pentatonic-shang",
+            "name": "D 商调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-jue.mid",
+      "bytes": 194,
+      "description": "C 宫系统五声, final E → E 角调式. Same pitch set as the other four, different 结音.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "E",
+            "scaleId": "pentatonic-jue",
+            "name": "E 角调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-zhi.mid",
+      "bytes": 194,
+      "description": "C 宫系统五声, final G → G 徵调式. Same pitch set as the other four, different 结音.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "G",
+            "scaleId": "pentatonic-zhi",
+            "name": "G 徵调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-pentatonic-c-gong-yu.mid",
+      "bytes": 194,
+      "description": "C 宫系统五声, final A → A 羽调式. Same pitch set as the other four, different 结音.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "A",
+            "scaleId": "pentatonic-yu",
+            "name": "A 羽调式（C 宫系统，五声）"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR",
+            "TOO_SHORT",
+            "MULTIPLE_COLLECTIONS"
+          ]
+        }
+      }
+    },
+    {
+      "file": "missing-degrees-cdega.mid",
+      "bytes": 194,
+      "description": "Only C D E G A, ending on C: C 宫 (五声); cannot tell C Ionian / Lydian / Mixolydian.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "C",
+            "scaleId": "pentatonic-gong"
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR"
+          ],
+          "missingDegreesScaleIds": [
+            "ionian",
+            "lydian",
+            "mixolydian"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-hexatonic-d-shang-qingjiao.mid",
+      "bytes": 203,
+      "description": "C D E F G A ending on D: D 商调式 (C 宫系统，六声加清角), also readable as D 羽 (F 宫加变宫).",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "D",
+            "scaleId": "hexa-qingjiao-shang",
+            "name": "D 商调式（C 宫系统，六声加清角）",
+            "aliases": [
+              "hexa-biangong-yu"
+            ]
+          },
+          "ambiguities": [
+            "MISSING_DEGREES"
+          ],
+          "absent": [
+            "TONIC_UNCLEAR"
+          ],
+          "missingDegreesScaleIds": [
+            "dorian",
+            "aeolian"
+          ]
+        }
+      }
+    },
+    {
+      "file": "mode-qingyue-a-yu.mid",
+      "bytes": 203,
+      "description": "A 羽调式 (C 宫系统，七声清乐) — the same pitch structure as A Aeolian.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "A",
+            "scaleId": "aeolian",
+            "aliases": [
+              "qingyue-yu",
+              "yayue-jue",
+              "yanyue-shang"
+            ]
+          },
+          "ambiguities": [],
+          "absent": [
+            "MISSING_DEGREES",
+            "TONIC_UNCLEAR"
+          ]
+        }
+      }
+    },
+    {
+      "file": "tonic-unclear-pentatonic.mid",
+      "bytes": 185,
+      "description": "C 宫五声 whose phrases and long notes stress A but which ends on a short D.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "ambiguities": [
+            "TONIC_UNCLEAR"
+          ]
+        }
+      }
+    },
+    {
+      "file": "short-three-notes.mid",
+      "bytes": 68,
+      "description": "C D C: too short to judge.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "ambiguities": [
+            "TOO_SHORT"
+          ]
+        }
+      }
+    },
+    {
+      "file": "short-repeated-note.mid",
+      "bytes": 77,
+      "description": "E E E E: one pitch class only.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "ambiguities": [
+            "TOO_SHORT"
+          ]
+        }
+      }
+    },
+    {
+      "file": "overlap-legato.mid",
+      "bytes": 113,
+      "description": "D4 starts 5 ticks before C4 ends (≈5 ms at 120 BPM / 480 PPQ): repairable legato tail.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": false,
+          "codes": [
+            "OVERLAP"
+          ],
+          "repairable": 1
+        }
+      }
+    },
+    {
+      "file": "overlap-heavy.mid",
+      "bytes": 114,
+      "description": "C4 sustains half a beat into D4: beyond tolerance, rejected.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": false,
+          "monophonic": false,
+          "codes": [
+            "OVERLAP"
+          ],
+          "repairable": 0
+        }
+      }
+    },
+    {
+      "file": "overlap-nested.mid",
+      "bytes": 96,
+      "description": "A whole-note C4 under E4 and G4: nested overlap caught via the running max end tick.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": false,
+          "monophonic": false,
+          "codes": [
+            "OVERLAP"
+          ],
+          "repairable": 0
+        }
+      }
+    },
+    {
+      "file": "same-tick-chord.mid",
+      "bytes": 121,
+      "description": "C4 and E4 start on the same tick: a chord, never repairable by trimming.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": false,
+          "monophonic": false,
+          "codes": [
+            "SAME_TICK_CHORD"
+          ],
+          "repairable": 0
+        }
+      }
+    },
+    {
+      "file": "zero-length-note.mid",
+      "bytes": 122,
+      "description": "A note-on immediately followed by its note-off at the same tick.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": false,
+          "monophonic": true,
+          "codes": [
+            "INVALID_DURATION"
+          ]
+        }
+      }
+    },
+    {
+      "file": "pitch-bend-sustain.mid",
+      "bytes": 129,
+      "description": "Clean monophonic line that uses pitch bend and the sustain pedal (CC64).",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": [
+            "PITCH_BEND_PRESENT",
+            "SUSTAIN_PEDAL_PRESENT"
+          ]
+        }
+      }
+    },
+    {
+      "file": "type0-multichannel.mid",
+      "bytes": 304,
+      "description": "Type 0: melody on channel 1, bass on channel 2, drums on channel 10, all in one track.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 0,
+          "melodyTracks": 2,
+          "percussionTracks": 1,
+          "warnings": [
+            "TYPE0_SPLIT_BY_CHANNEL"
+          ]
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "D",
+            "scaleId": "dorian"
+          },
+          "ambiguities": [],
+          "absent": [
+            "TONIC_UNCLEAR"
+          ]
+        }
+      }
+    },
+    {
+      "file": "type1-empty-percussion.mid",
+      "bytes": 300,
+      "description": "Type 1: conductor track, a named empty track, a drum track (channel 10) and the melody.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "melodyTracks": 1,
+          "percussionTracks": 1,
+          "emptyTracks": 1
+        },
+        "validation": {
+          "trackId": "track-1",
+          "ok": false,
+          "monophonic": true,
+          "codes": [
+            "PERCUSSION_TRACK"
+          ]
+        },
+        "analysis": {
+          "trackId": "track-2",
+          "top": {
+            "root": "D",
+            "scaleId": "dorian"
+          },
+          "ambiguities": []
+        }
+      }
+    },
+    {
+      "file": "tempo-timesig-changes.mid",
+      "bytes": 218,
+      "description": "PPQ 96; 120 → 90 BPM and 4/4 → 3/4 at bar 3; D Dorian line.",
+      "expect": {
+        "import": {
+          "ok": true,
+          "format": 1,
+          "ppq": 96,
+          "melodyTracks": 1,
+          "tempoCount": 2,
+          "timeSignatureCount": 2
+        },
+        "validation": {
+          "trackId": "track-0",
+          "ok": true,
+          "monophonic": true,
+          "codes": []
+        },
+        "analysis": {
+          "trackId": "track-0",
+          "top": {
+            "root": "D",
+            "scaleId": "dorian"
+          },
+          "ambiguities": []
+        }
+      }
+    },
+    {
+      "file": "malformed-empty.mid",
+      "bytes": 0,
+      "description": "Zero bytes.",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "EMPTY_FILE"
+        }
+      }
+    },
+    {
+      "file": "malformed-not-midi.mid",
+      "bytes": 36,
+      "description": "Plain text with a .mid extension.",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "NOT_MIDI"
+        }
+      }
+    },
+    {
+      "file": "malformed-truncated.mid",
+      "bytes": 30,
+      "description": "MTrk chunk declares 1000 bytes; the file ends after 8.",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "TRUNCATED"
+        }
+      }
+    },
+    {
+      "file": "malformed-running-status.mid",
+      "bytes": 29,
+      "description": "A data byte with no preceding status byte.",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "PARSE_FAILED"
+        }
+      }
+    },
+    {
+      "file": "unsupported-format2.mid",
+      "bytes": 98,
+      "description": "MIDI format 2 (independent sequences).",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "UNSUPPORTED_FORMAT"
+        }
+      }
+    },
+    {
+      "file": "unsupported-smpte.mid",
+      "bytes": 98,
+      "description": "SMPTE time division (25 fps, 40 ticks per frame).",
+      "expect": {
+        "import": {
+          "ok": false,
+          "errorCode": "SMPTE_TIMING"
+        }
+      }
+    }
+  ]
+}
