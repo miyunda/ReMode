@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+  - tools/*
+  - apps/*
+minimumReleaseAgeExclude:
+  - '@vitest/mocker@5.1.0'
+  - '@vitest/spy@5.1.0'
+  - vitest@5.1.0
+
+# esbuild ships prebuilt platform binaries as optional deps; its postinstall is not needed.
+allowBuilds:
+  esbuild: false

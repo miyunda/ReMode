@@ -1,0 +1,13 @@
+{
+  "name": "@remode/fixtures",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic MIDI fixture generator (writes fixtures/generated).",
+  "scripts": {
+    "generate": "tsx src/generate.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}
