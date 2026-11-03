@@ -388,11 +388,11 @@ interface ChineseModeRef {
 
 ```typescript
 interface CollectionMatch {
-  collectionId: string;       // 如 'diatonic' | 'pentatonic' | 'hexa-qingjiao' ...
+  collectionId: 'pentatonic' | 'hexatonic' | 'diatonic'; // 音集按音高集合区分；六声/七声的中国解读见 aliases（M0 决定）
   transposition: number;      // 0..11
   coverage: number;           // 集内时值占比，0..1
   outOfSet: Array<{ pitchClass: number; durationShare: number }>;
-  unusedDegrees: number[];    // 音集内未出现的音级
+  unusedDegrees: number[];    // 音集内未出现的音级，记为绝对音级 0..11（此步尚无主音）
 }
 
 interface TonicEvidence {
@@ -430,6 +430,7 @@ interface ModeAnalysis {
 
 示例：旋律只用 C D E G A 并结束于 C → 结论“C 宫（五声）”；同时报告 `MISSING_DEGREES`：“未使用第 4、7 级，无法区分 C Ionian / Lydian / Mixolydian”。
 
+- **M0 实现说明**：候选按具名证据点数之和（`evidencePoints`，整数，随 `analysisVersion` 与 `config` 一并输出）排序，并与每条证据并列展示，因此不是不透明总分；计数型证据（句末、长音、强拍）按“命中数 / 总数”比例取整给点。`ModeCandidate` 另含 `name`、`chinese`、`aliases`（同音集同主音的其他命名，如 A Aeolian ≡ A 羽调式（C 宫系统，七声清乐））；`Ambiguity` 另含 `affectedModes` 与 `missingDegrees`（相对主音的级数）。细节见 `docs/decisions/m0-implementation-notes.md`。
 - 不把任何分数显示成百分比概率。若未来需要校准概率，采用 Temperley 式生成式贝叶斯模型并另立 ADR，而不是将启发式分数改名为“置信度”。
 - Krumhansl–Schmuckler / Pearson 仅作为**评测对照基线**保留在测试报告中，不进入默认判定。
 - 允许用户手动指定来源主音和调式；该操作优先于自动检测。
@@ -806,14 +807,14 @@ Invariant G:
 
 ### M0 — Core / CLI（先做）
 
-- [ ] 建立 pnpm workspace + TypeScript strict + Vitest + ESLint。
-- [ ] 实现 `MelodyNote` / `MidiMetadata` / `MelodyProject` / `ModeAnalysis` 类型。
-- [ ] 实现 MIDI import，支持 track/channel 信息和基本元数据。
-- [ ] 实现单音检测和可选安全修复；输出结构化错误。
-- [ ] 实现调式库：七个教会调式、五声五调、六声/七声（清乐、雅乐、燕乐）定义、音级身份表与“宫系统 + 主音”命名。
-- [ ] 实现两步分析：PCD → 音集识别（覆盖率、未使用音级）→ 主音证据 → 候选与结构性歧义；K-S/Pearson 仅作对照基线。
-- [ ] 实现 CLI：分析文件，输出候选、证据、歧义与异常报告（JSON）。
-- [ ] 生成覆盖七声、五声五调、缺失音级和边界情况的 fixture。
+- [x] 建立 pnpm workspace + TypeScript strict + Vitest + ESLint。
+- [x] 实现 `MelodyNote` / `MidiMetadata` / `MelodyProject` / `ModeAnalysis` 类型。
+- [x] 实现 MIDI import，支持 track/channel 信息和基本元数据。
+- [x] 实现单音检测和可选安全修复；输出结构化错误。
+- [x] 实现调式库：七个教会调式、五声五调、六声/七声（清乐、雅乐、燕乐）定义、音级身份表与“宫系统 + 主音”命名。
+- [x] 实现两步分析：PCD → 音集识别（覆盖率、未使用音级）→ 主音证据 → 候选与结构性歧义；K-S/Pearson 仅作对照基线。
+- [x] 实现 CLI：分析文件，输出候选、证据、歧义与异常报告（JSON）。
+- [x] 生成覆盖七声、五声五调、缺失音级和边界情况的 fixture。
 
 **DoD**：可在 Node CLI 读取测试 MIDI、分析并获得机器可读 JSON；所有核心测试通过；无任何百分比置信度输出。
 

@@ -16,6 +16,13 @@
 
 规格文档：`docs/ReMode-Development-Plan.md`（v1.1）。
 
+### 仓库命令（M0 起）
+
+- `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke`：与 CI 相同的检查。
+- `pnpm fixtures`：重新生成 `fixtures/generated/`（修改 `tools/fixtures/src/catalog.ts` 后必须运行并提交，测试会比对字节）。
+- `node tools/cli/dist/main.js analyze <file.mid> [--track N] [--repair]`：JSON 分析报告。
+- 实现对规格的具体化与偏差记录在 `docs/decisions/`（M0：`m0-implementation-notes.md`）。
+
 ### 分支与发布流程
 
 - **不直接提交到 `main`**。`main` 是 Cloudflare 生产分支，只通过 GitHub PR 合并更新。
