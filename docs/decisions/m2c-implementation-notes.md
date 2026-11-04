@@ -28,14 +28,14 @@ M2c 做 Transport、循环、drone、音符试听，以及新建旋律草稿的�
 |---|---|---|
 | Tone.js 版本 | **15.1.22**（npm `latest`，2025-04 发布），精确锁定。`next` 标签（15.5.x）是开发版，不用 | 稳定版，且已在下面的 CSP 条件下实测 |
 | CSP | **`_headers` 没有改动**。Tone 有两处会被 `worker-src 'self'` / `script-src 'self'` 拒绝：`Ticker` 的默认时钟用 blob: Worker；`AudioWorklet` 也用 blob: URL。做法：① 不从 `tone` 根模块导入，它的 `index.js` 在求值时调用 `getContext()`，加载页面就会创建默认 Context、AudioContext 和 blob Worker；改为深路径导入 `Global`、`Context`、`Synth`。② 在创建任何节点之前 `setContext()`，用 `clockSource: 'timeout'` 的 Context。③ 不用任何 Worklet 节点 | 不放宽策略比放宽好。实测：无头 Chromium 在生产 CSP 下没有违规和 console error；临时探针（在 destination 前接 AnalyserNode，未入库）读到播放时 RMS 约 0.1，暂停 300 ms 后约 0.0008，说明真的有输出且没有粘连。`test/boundaries.test.ts` 防止有人改回根模块导入 |
-| 用不用 Tone.Transport | **不用**。engine 自己做预排程，Tone 只负责合成 | 一个 tick 位置、一份 tempo map，由纯逻辑换算；这样切换方案、循环、定位都能用假后端精确测试。Tone.Transport 还会把 Draw、Listener 等一起带进来 |
+| 用不用 Tone.Transport | **不用**。engine 自己做预排程，Tone 只负责合成 | 一个 tick 位置、一份 tempo map，由纯逻辑换算；这样切换方案、循环、定位都能用假后端精确测试 |
 | 调度 | 预排程：每 25 ms 把未来 150 ms 内的音交给后端（隐藏标签页 1.5 s，因为定时器被节流）。播放时间轴是一串“段”：音频时间 T 时位置是 tick P，运行到 tick E。循环追加一段；切换、定位、改循环都取消所有音并在当前位置开新段（延后 30 ms，保证第一个音不迟到）。待发声的音只有一个来源，所以不会粘连或叠音 | 经典做法。fast-check 属性测试随机组合播放、暂停、停止、定位、切换、循环和时间推进（200 轮），每一步断言最多一个音在响、位置在范围内、不播放时没有声音也没有 drone，整轮结束后断言任何两个音都没有在时间上重叠 |
 | 切换方案 | 位置以 tick 保持。跨越当前位置的音从当前位置发声（剩余不足 30 ms 的跳过）。发声内容完全相同时（如改了调式但音相同）不重启，避免无谓的重新起音 | A/B 比较时，长音上切换也要立刻听到新方案 |
 | 每个音一个 Synth | 每个音 `new Synth`，经一个原生 GainNode 接到总线，结束后释放；取消时 GainNode 用 `setTargetAtTime` 约 6 ms 淡出，未开始的直接释放 | Tone 的 `PolySynth` 靠 Context 时钟延迟触发，取消已排程的音很麻烦。实测：300 BPM 十六分音符（每秒 20 个音）播放 5 秒，没有 long task，JS 堆约 11 MB |
 | 解锁音频 | `AudioContext` 在手势内同步创建并 `resume()`（`webAudioHost.ts`），Tone 之后接管这个 Context，而不是调用 `Tone.start()`。触摸的 pointerdown 不算激活，所以挂一次 pointerup/click 重试。等待运行超过 3 秒就报“音频未能启动”，下次手势重试 | Safari 不接受 await 之后的 `resume()`，而 Tone 是懒加载的，必须在 await 之前。`Tone.start()` 做的也是 `resume()` |
 | 第一次手势不丢声音 | `audition` 记下待发声的音高，后端就绪后发声；连续多次取最后一个。`play` 同理，就绪前按了停止则取消 | 任务要求 |
 | 懒加载 + 无运行时请求 | `toneBackend` 是动态 import，不进入入口 chunk；但在 `main.tsx` 里页面加载时就取回（`preloadAudio`）。模块求值没有副作用，不创建 AudioContext | 若首次手势才取，既违反“运行时不发请求”（E2E 断言），也让“加载后断网”时播放失败（§14 DoD）。首屏 JS 不变大，只是多一个并行请求 |
-| 体积 | 入口 JS 402.09 → 426.37 kB（gzip 128.17 → 136.64）；新增懒加载 chunk 209.92 kB（gzip 53.12）。CSS 20.53 → 21.22 kB | Tone 根导入会更大；深路径导入只带 `Synth` 及其依赖 |
+| 体积 | 入口 JS 402.09 → 426.37 kB（gzip 128.17 → 136.64）；新增懒加载 chunk 209.92 kB（gzip 53.12）。CSS 20.53 → 21.22 kB | 深路径导入只带 `Synth` 及其依赖，不带 Tone 的其余部分 |
 | **drone 默认状态（§18 问题 5 是开放问题）** | **默认开，仅主音**，音量 60%（相对主音量）。保存在 localStorage。改默认值只需改 `DEFAULT_AUDIO_PREFS` 一行 | ADR-014 与产品原则 8：调式色彩要被听见，默认关的话多数用户根本听不到差别。只用主音而不是主音 + 五度：主音是唯一所有调式都有的参照；纯五度在 Locrian、角调式等调内不存在。**这只是暂定，规格仍把它列为待试听验证的问题**，请人工试听后决定 |
 | drone 音高 | 根音固定在 G2–F#3 这一个八度内；五度始终是纯五度（+7） | 不随旋律音域变化，切换方案时音域不跳。旋律落在很低的音区时会与 drone 相撞，属已知限制 |
 | drone 与主音 | 所选方案的调式：原曲 = 来源调式；Strict = 目标；移调 = 来源调式平移；Custom = 派生来源的调式；草稿 = `1=` 的调（ionian）。来源调式未确定（`sourceMode` 不成立）时**不猜**，不发声并提示先指定 | 猜错的 drone 比没有更误导。新增 `variantMode`（`state/project.ts`） |
@@ -71,5 +71,4 @@ M2c 做 Transport、循环、drone、音符试听，以及新建旋律草稿的�
 - 关闭循环、改循环会让正在响的音重新起音。
 - drone 音区固定，旋律在 G2–F#3 附近时会相撞。
 - 编辑速度只在新建旋律模式可用；导入的 tempo map 按原样播放。
-- 重叠的音（修复前不可用，修复后不存在）不是问题；但如果未来允许多声部，“同时最多一个音”的属性测试要改。
 - drone 独立轨导出未实现。
