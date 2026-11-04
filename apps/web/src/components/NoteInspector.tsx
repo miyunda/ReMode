@@ -1,4 +1,5 @@
 import { degreeOf, inMode, pitchName, stepPitch, type ModeRef } from '@remode/core';
+import { useEngine } from '../audio/AudioProvider';
 import { barBeat, beats, signed } from '../lib/format';
 import { codeLabel, degreeRoleLabel } from '../lib/labels';
 import { activeVariant, sourceMode, targetMode } from '../state/project';
@@ -26,6 +27,7 @@ function Degree({ pitch, mode }: { pitch: number; mode: (ModeRef & { name: strin
 export function NoteInspector() {
   const state = useProject();
   const dispatch = useDispatch();
+  const engine = useEngine();
   const { original, selectedNoteId, snap, custom } = state;
   const active = activeVariant(state);
   const index = original?.notes.findIndex((n) => n.id === selectedNoteId) ?? -1;
@@ -50,7 +52,9 @@ export function NoteInspector() {
   const out = tgt !== null && active.id !== 'original' && !inMode(cur.pitch, tgt);
   const editsHere = custom?.edits.filter((e) => e.noteId === cur.id).length ?? 0;
   const edit = (toPitch: number, createdAt: number) => {
-    if (toPitch !== cur.pitch) dispatch({ type: 'EDIT_PITCH', noteId: cur.id, toPitch, createdAt });
+    if (toPitch === cur.pitch) return;
+    dispatch({ type: 'EDIT_PITCH', noteId: cur.id, toPitch, createdAt });
+    engine.audition(toPitch);
   };
 
   return (
@@ -134,7 +138,10 @@ export function NoteInspector() {
           type="button"
           className="btn"
           disabled={cur.pitch === orig.pitch}
-          onClick={() => dispatch({ type: 'REVERT_NOTE', noteId: cur.id, createdAt: Date.now() })}
+          onClick={() => {
+            dispatch({ type: 'REVERT_NOTE', noteId: cur.id, createdAt: Date.now() });
+            engine.audition(orig.pitch);
+          }}
           data-testid="revert-note"
         >
           恢复此音（{pitchName(orig.pitch)}）

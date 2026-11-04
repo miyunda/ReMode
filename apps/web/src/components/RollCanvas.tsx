@@ -33,6 +33,7 @@ import {
   fitView,
   gridLines,
   hitNote,
+  nearestTick,
   pitchRange,
   pitchToY,
   snapTick,
@@ -51,6 +52,17 @@ export interface RollScales {
 }
 
 type NotePatch = Partial<Pick<MelodyNote, 'pitch' | 'startTick' | 'durationTick'>>;
+
+/** What the roll shows of the transport. */
+export interface RollPlayback {
+  /** Live position; read in animation frames. */
+  tick: () => number;
+  playing: boolean;
+  /** The position at the last discrete change (a seek, a stop). */
+  atTick: number;
+  loop: { startTick: number; endTick: number } | null;
+  loopOn: boolean;
+}
 
 export interface RollCanvasProps {
   label: string;
@@ -76,9 +88,17 @@ export interface RollCanvasProps {
   /** Compose mode. */
   quantum?: number;
   minTicks?: number;
-  onAdd?: (pitch: number, startTick: number) => void;
-  onUpdate?: (id: string, patch: NotePatch) => void;
+  /** Returns false when the edit is refused (overlap, limits), so no sound follows it. */
+  onAdd?: (pitch: number, startTick: number) => boolean;
+  onUpdate?: (id: string, patch: NotePatch) => boolean;
   onDelete?: (id: string) => void;
+  playback?: RollPlayback;
+  /** A click on the ruler. */
+  onSeek?: (tick: number) => void;
+  /** A drag along the ruler. */
+  onLoopRange?: (fromTick: number, toTick: number) => void;
+  /** A short note: selection, an added note, a pitch change, the keyboard gutter. */
+  onAudition?: (pitch: number) => void;
   /** The view refits when this changes (a new melody, a new draft). */
   fitKey: unknown;
 }
@@ -181,9 +201,14 @@ type Drag =
       pitch: number;
       patch: NotePatch;
       moved: boolean;
-    };
+    }
+  | { kind: 'ruler'; x0: number; tick: number; to: number; moved: boolean };
 
 const MIN_TICKS_PAD = 1;
+/** Pixels of pointer travel that turn a ruler click into a loop drag. */
+const RULER_DRAG_PX = 6;
+/** The playhead turns the page this far from the right edge. */
+const FOLLOW_MARGIN = 40;
 
 export function RollCanvas(props: RollCanvasProps) {
   const {
@@ -201,6 +226,9 @@ export function RollCanvas(props: RollCanvasProps) {
   } = props;
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const playheadRef = useRef<HTMLDivElement>(null);
+  // The last pitch sounded during a drag: pointer moves can arrive between renders.
+  const dragSounded = useRef<number | null>(null);
   const palette = usePalette();
   const helpId = useId();
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -211,7 +239,7 @@ export function RollCanvas(props: RollCanvasProps) {
 
   // Displayed notes: the drag preview replaces its note.
   const shown = useMemo(() => {
-    if (!drag?.moved) return notes;
+    if (!drag?.moved || drag.kind === 'ruler') return notes;
     return notes.map((n) =>
       n.id !== drag.id
         ? n
@@ -375,6 +403,38 @@ export function RollCanvas(props: RollCanvasProps) {
     }
     ctx.setLineDash([]);
 
+    // Loop range: shaded while on; both edges are solid lines (with [ ] in the ruler).
+    const loopRange =
+      drag?.kind === 'ruler' && drag.moved
+        ? {
+            startTick: Math.min(drag.tick, drag.to),
+            endTick: Math.max(drag.tick, drag.to),
+            on: true,
+          }
+        : props.playback?.loop
+          ? { ...props.playback.loop, on: props.playback.loopOn }
+          : null;
+    if (loopRange?.on) {
+      const x0 = Math.max(GUTTER, tickToX(view, loopRange.startTick));
+      const x1 = Math.min(W, tickToX(view, loopRange.endTick));
+      if (x1 > x0) {
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = p.connector;
+        ctx.fillRect(x0, RULER, x1 - x0, H - RULER);
+        ctx.globalAlpha = 1;
+      }
+      ctx.strokeStyle = p.connector;
+      ctx.lineWidth = 1.5;
+      for (const t of [loopRange.startTick, loopRange.endTick]) {
+        const x = Math.round(tickToX(view, t)) + 0.5;
+        if (x < GUTTER || x > W) continue;
+        ctx.beginPath();
+        ctx.moveTo(x, RULER);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+    }
+
     const visible = (n: MelodyNote) =>
       n.startTick + n.durationTick >= t0 &&
       n.startTick <= t1 &&
@@ -428,7 +488,8 @@ export function RollCanvas(props: RollCanvasProps) {
       const g = ghostById?.get(n.id);
       const changed = !!g && g.pitch !== n.pitch;
       const manual =
-        changes.get(n.id)?.reasonCode === 'MANUAL_EDIT' || (drag?.moved && drag.id === n.id);
+        changes.get(n.id)?.reasonCode === 'MANUAL_EDIT' ||
+        (drag?.moved && drag.kind !== 'ruler' && drag.id === n.id);
       ctx.fillStyle = changed ? p.changed : p.accent;
       ctx.fillRect(r.x, r.y, r.w, r.h);
       if (changed) {
@@ -531,6 +592,22 @@ export function RollCanvas(props: RollCanvasProps) {
       ctx.fillText(`P${i + 2}`, x + 5, RULER - 5);
       ctx.font = '11px system-ui, sans-serif';
     });
+    if (loopRange) {
+      const x0 = tickToX(view, loopRange.startTick);
+      const x1 = tickToX(view, loopRange.endTick);
+      ctx.strokeStyle = p.connector;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(loopRange.on ? [] : [3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(Math.max(GUTTER, x0), RULER - 2);
+      ctx.lineTo(Math.min(W, x1), RULER - 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = p.connector;
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      if (x0 >= GUTTER && x0 <= W) ctx.fillText('[', x0 + 2, RULER - 9);
+      if (x1 >= GUTTER && x1 <= W) ctx.fillText(']', x1 - 6, RULER - 9);
+    }
     ctx.fillStyle = p.surface;
     ctx.fillRect(0, 0, GUTTER, RULER);
   });
@@ -554,19 +631,32 @@ export function RollCanvas(props: RollCanvasProps) {
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
     const { x, y } = local(e);
-    if (x < GUTTER || y < RULER) return;
+    if (y < RULER) {
+      if (x < GUTTER || !props.onSeek) return;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      const tick = xToTick(view, x);
+      setDrag({ kind: 'ruler', x0: x, tick, to: tick, moved: false });
+      return;
+    }
+    if (x < GUTTER) {
+      props.onAudition?.(yToPitch(view, y));
+      return;
+    }
     boxRef.current?.focus({ preventScroll: true });
     const i = noteAt(x, y);
     const n = notes[i];
     const touch = e.pointerType === 'touch';
     if (!n) {
       if (mode === 'compose' && props.onAdd) {
-        props.onAdd(yToPitch(view, y), snapTick(xToTick(view, x), quantum));
+        const pitch = yToPitch(view, y);
+        if (props.onAdd(pitch, snapTick(xToTick(view, x), quantum))) props.onAudition?.(pitch);
       } else onSelect(null);
       return;
     }
     onSelect(n.id);
     setAnnounce(`已选中${describe(n)}`);
+    props.onAudition?.(n.pitch);
+    dragSounded.current = n.pitch;
     if (touch) return; // touch: tap selects; pitch / time via keyboard or the inspector buttons
     e.currentTarget.setPointerCapture?.(e.pointerId);
     if (mode === 'edit') {
@@ -589,10 +679,32 @@ export function RollCanvas(props: RollCanvasProps) {
   const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
     if (!drag) return;
     const { x, y } = local(e);
+    // Sounds at the moment the pitch changes, not on every pointer move.
+    const sound = (pitch: number) => {
+      if (pitch === dragSounded.current) return;
+      dragSounded.current = pitch;
+      props.onAudition?.(pitch);
+    };
+    if (drag.kind === 'ruler') {
+      const moved = drag.moved || Math.abs(x - drag.x0) >= RULER_DRAG_PX;
+      if (moved) {
+        const grid = meta.ppq / 2;
+        setDrag({
+          ...drag,
+          tick: drag.moved ? drag.tick : nearestTick(drag.tick, grid),
+          to: nearestTick(xToTick(view, x), grid),
+          moved,
+        });
+      }
+      return;
+    }
     if (drag.kind === 'pitch') {
       const raw = yToPitch(view, y);
       const pitch = props.dragPitch ? props.dragPitch(raw) : raw;
-      if (pitch !== drag.pitch || drag.moved) setDrag({ ...drag, pitch, moved: true });
+      if (pitch !== drag.pitch || drag.moved) {
+        setDrag({ ...drag, pitch, moved: true });
+        sound(pitch);
+      }
       return;
     }
     const dt = Math.round((x - drag.x0) / view.pxPerTick / quantum) * quantum;
@@ -604,13 +716,20 @@ export function RollCanvas(props: RollCanvasProps) {
       patch.durationTick !== drag.patch.durationTick ||
       patch.startTick !== drag.patch.startTick ||
       patch.pitch !== drag.patch.pitch
-    )
+    ) {
       setDrag({ ...drag, patch, moved: true });
+      if (patch.pitch !== undefined) sound(patch.pitch);
+    }
   };
 
   const onPointerUp = () => {
     const d = drag;
     setDrag(null);
+    if (d?.kind === 'ruler') {
+      if (d.moved) props.onLoopRange?.(d.tick, d.to);
+      else props.onSeek?.(nearestTick(d.tick, meta.ppq / 4));
+      return;
+    }
     if (!d?.moved) return;
     if (d.kind === 'pitch') {
       const n = notes.find((x) => x.id === d.id);
@@ -646,6 +765,7 @@ export function RollCanvas(props: RollCanvasProps) {
       if (!n) return;
       onSelect(n.id);
       setAnnounce(`已选中${describe(n)}`);
+      if (n.id !== cur?.id) props.onAudition?.(n.pitch);
     };
     const key = e.key;
     let handled = true;
@@ -661,9 +781,11 @@ export function RollCanvas(props: RollCanvasProps) {
         if (to !== cur.pitch) {
           props.onPitch(cur.id, to);
           setAnnounce(`${describe(cur)} 改为 ${pitchName(to)}`);
+          props.onAudition?.(to);
         }
       } else if (mode === 'compose') {
-        props.onUpdate?.(cur.id, { pitch: cur.pitch + dir * (e.shiftKey ? 12 : 1) });
+        const pitch = cur.pitch + dir * (e.shiftKey ? 12 : 1);
+        if (props.onUpdate?.(cur.id, { pitch })) props.onAudition?.(pitch);
       }
     } else if (mode === 'compose' && cur && (key === 'ArrowLeft' || key === 'ArrowRight')) {
       const dir = key === 'ArrowRight' ? 1 : -1;
@@ -679,7 +801,9 @@ export function RollCanvas(props: RollCanvasProps) {
     } else if (mode === 'compose' && key === 'Enter' && props.onAdd) {
       const last = notes[order[order.length - 1] as number];
       const after = cur ?? last;
-      props.onAdd(after?.pitch ?? 60, after ? after.startTick + after.durationTick : 0);
+      const pitch = after?.pitch ?? 60;
+      if (props.onAdd(pitch, after ? after.startTick + after.durationTick : 0))
+        props.onAudition?.(pitch);
     } else handled = false;
     if (handled) e.preventDefault();
   };
@@ -711,6 +835,37 @@ export function RollCanvas(props: RollCanvasProps) {
     box.addEventListener('wheel', onWheel, { passive: false });
     return () => box.removeEventListener('wheel', onWheel);
   }, []);
+
+  // The playhead: moved in animation frames, so playback never re-renders the roll.
+  const paintView = useRef({ view, width: size.width, dragging: false });
+  useEffect(() => {
+    paintView.current = { view, width: size.width, dragging: drag !== null };
+  });
+  const playback = props.playback;
+  const tickNow = playback?.tick;
+  const playing = playback?.playing ?? false;
+  const atTick = playback?.atTick;
+  useEffect(() => {
+    const el = playheadRef.current;
+    if (!el || !tickNow) return;
+    let raf = 0;
+    let wasVisible = false;
+    const paint = () => {
+      const { view: v, width, dragging } = paintView.current;
+      const tick = tickNow();
+      const x = tickToX(v, tick);
+      const box = boxRef.current;
+      if (playing && wasVisible && !dragging && box && (x > width - FOLLOW_MARGIN || x < GUTTER))
+        box.scrollLeft = Math.max(0, x + v.scrollX - GUTTER - FOLLOW_MARGIN);
+      wasVisible = x >= GUTTER && x <= width;
+      el.dataset['tick'] = String(Math.round(tick));
+      el.style.display = wasVisible ? 'block' : 'none';
+      el.style.transform = `translateX(${x}px)`;
+      if (playing) raf = requestAnimationFrame(paint);
+    };
+    paint();
+    return () => cancelAnimationFrame(raf);
+  }, [tickNow, playing, atTick, scroll.x, zoom.pxPerTick, size.width]);
 
   const selected = notes.find((n) => n.id === selectedId);
   return (
@@ -778,26 +933,39 @@ export function RollCanvas(props: RollCanvasProps) {
             height: Math.max(content.height, size.height),
           }}
         >
-          <canvas
-            ref={canvasRef}
-            className="sticky top-0 left-0 block touch-pan-x touch-pan-y"
-            style={{
-              width: size.width,
-              height: size.height,
-              cursor: drag ? 'grabbing' : 'default',
-            }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={() => setDrag(null)}
-            aria-hidden="true"
-          />
+          <div
+            className="sticky top-0 left-0 overflow-hidden"
+            style={{ width: size.width, height: size.height }}
+          >
+            <canvas
+              ref={canvasRef}
+              className="block touch-pan-x touch-pan-y"
+              style={{
+                width: size.width,
+                height: size.height,
+                cursor: drag ? 'grabbing' : 'default',
+              }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={() => setDrag(null)}
+              aria-hidden="true"
+            />
+            {playback && (
+              <div
+                ref={playheadRef}
+                className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-text"
+                data-testid="playhead"
+                aria-hidden="true"
+              />
+            )}
+          </div>
         </div>
       </div>
       <p id={helpId} className="text-xs text-muted-text">
         {mode === 'edit'
-          ? '键盘：←/→ 选择上一个/下一个音，↑/↓ 改音高（吸附时按音阶级进，否则按半音），Shift+↑/↓ 改八度，Esc 取消选择；鼠标可上下拖动音符。只改音高，不改时值。'
-          : '键盘：Enter 在所选音之后添加音，←/→ 选择，↑/↓ 改音高（Shift 为八度），Shift+←/→ 移动，Alt+←/→ 缩短/加长，Delete 删除；鼠标点击空白处添加，拖动移动，拖右边缘改时值。'}
+          ? '键盘：←/→ 选择上一个/下一个音，↑/↓ 改音高（吸附时按音阶级进，否则按半音），Shift+↑/↓ 改八度，Esc 取消选择；鼠标可上下拖动音符。只改音高，不改时值。点击顶部标尺定位，沿标尺拖动设循环区间，点击左侧琴键试听。'
+          : '键盘：Enter 在所选音之后添加音，←/→ 选择，↑/↓ 改音高（Shift 为八度），Shift+←/→ 移动，Alt+←/→ 缩短/加长，Delete 删除；鼠标点击空白处添加，拖动移动，拖右边缘改时值。点击顶部标尺定位，沿标尺拖动设循环区间，点击左侧琴键试听。'}
       </p>
       <p className="sr-only" aria-live="polite" data-testid="roll-announce">
         {announce}
