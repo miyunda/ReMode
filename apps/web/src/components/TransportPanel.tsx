@@ -37,10 +37,15 @@ function variantLabel(state: ProjectState): string {
 function useTransportShortcuts() {
   const engine = useEngine();
   useEffect(() => {
+    let focusedByPointer = false;
+    const onPointer = () => (focusedByPointer = true);
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') focusedByPointer = false;
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.code === 'Space') {
-        if (!spaceIsTransport(e.target)) return;
+        if (!spaceIsTransport(e.target, focusedByPointer)) return;
         e.preventDefault(); // no page scroll, no click on a mouse-focused button
         if (!e.repeat) engine.toggle();
         return;
@@ -52,8 +57,14 @@ function useTransportShortcuts() {
       else return;
       e.preventDefault();
     };
+    window.addEventListener('pointerdown', onPointer, true);
+    window.addEventListener('keydown', onTab, true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointer, true);
+      window.removeEventListener('keydown', onTab, true);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [engine]);
 }
 

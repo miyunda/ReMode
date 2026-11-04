@@ -25,10 +25,10 @@ async function loadExample(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('workbench', () => {
-  it('shows the piano roll and a placeholder for the M2c transport', () => {
+  it('shows the piano roll and the transport', () => {
     setup();
     expect(screen.getByTestId('roll-empty')).toBeInTheDocument();
-    expect(screen.getByTestId('placeholder-transport')).toHaveTextContent('M2c');
+    expect(screen.getByTestId('transport')).toBeInTheDocument();
   });
 
   it('analyses the jianpu example: candidates, evidence, ambiguity codes, no percentages', async () => {
