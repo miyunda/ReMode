@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { ANALYSIS_VERSION, JIANPU_PARSER_VERSION, STRICT_TRANSFORM_VERSION } from '@remode/core';
 import { AnalysisView } from './components/AnalysisView';
 import { ChangeInspector } from './components/ChangeInspector';
+import { DraftPanel } from './components/DraftPanel';
 import { ImportPanel } from './components/ImportPanel';
+import { NoteInspector } from './components/NoteInspector';
+import { PianoRollPanel } from './components/PianoRollPanel';
 import { SourceModeCard } from './components/SourceModeCard';
 import { TargetPanel } from './components/TargetPanel';
 import { TrackList } from './components/TrackList';
 import { ValidationView } from './components/ValidationView';
 import { Section } from './components/ui';
 import { applyThemePref, readThemePref, saveThemePref, type ThemePref } from './lib/theme';
-import { ProjectProvider, useProject } from './state/ProjectContext';
+import { ProjectProvider, useDispatch, useProject } from './state/ProjectContext';
 
 function ThemeSelect() {
   const [pref, setPref] = useState<ThemePref>(readThemePref);
@@ -36,13 +39,16 @@ function ThemeSelect() {
 }
 
 function Header() {
-  const { input } = useProject();
-  const project =
-    input?.kind === 'midi'
+  const { input, draft } = useProject();
+  const project = draft
+    ? '新建旋律（编辑中）'
+    : input?.kind === 'midi'
       ? input.fileName
       : input?.kind === 'jianpu'
         ? (input.fileName ?? '简谱输入')
-        : null;
+        : input?.kind === 'new'
+          ? '新建旋律'
+          : null;
   return (
     <header className="border-b border-hl-med bg-surface">
       <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
@@ -66,19 +72,17 @@ function Placeholder({
   title,
   milestone,
   text,
-  tall,
 }: {
   id: string;
   title: string;
   milestone: string;
   text: string;
-  tall?: boolean;
 }) {
   return (
     <section
       aria-labelledby={`${id}-title`}
       data-testid={`placeholder-${id}`}
-      className={`flex flex-col justify-center gap-1 rounded-xl border-2 border-dashed border-hl-high p-4 ${tall ? 'min-h-40' : ''}`}
+      className="flex flex-col justify-center gap-1 rounded-xl border-2 border-dashed border-hl-high p-4"
     >
       <h2 id={`${id}-title`} className="panel-title">
         {title} <span className="normal-case tracking-normal">· 待实现（{milestone}）</span>
@@ -88,8 +92,28 @@ function Placeholder({
   );
 }
 
+/** Ctrl/Cmd+Z undo, Shift+Ctrl/Cmd+Z or Ctrl+Y redo; text fields keep their own undo. */
+function useUndoShortcuts() {
+  const dispatch = useDispatch();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z') dispatch({ type: e.shiftKey ? 'REDO' : 'UNDO' });
+      else if (key === 'y' && !e.shiftKey) dispatch({ type: 'REDO' });
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dispatch]);
+}
+
 function Workbench() {
-  const { original, analysis } = useProject();
+  const { original, analysis, draft } = useProject();
+  useUndoShortcuts();
   return (
     <div className="flex min-h-screen flex-col">
       <a
@@ -115,13 +139,14 @@ function Workbench() {
           </Section>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Placeholder
-            id="piano-roll"
-            title="Piano roll"
-            milestone="M2b"
-            tall
-            text="原曲虚影 + 当前方案、乐句标记与改动高亮；手动修音与撤销。"
-          />
+          {draft ? (
+            <DraftPanel />
+          ) : (
+            <>
+              <PianoRollPanel />
+              <NoteInspector />
+            </>
+          )}
           <Placeholder
             id="transport"
             title="Transport"

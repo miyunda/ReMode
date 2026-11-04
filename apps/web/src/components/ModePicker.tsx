@@ -159,9 +159,13 @@ export function ModePicker({
           </>
         )}
       </div>
-      <p id={`${id}-name`} className="text-sm" data-testid={testId && `${testId}-name`}>
+      <p
+        id={`${id}-name`}
+        className="text-sm"
+        data-testid={testId && `${testId}-name`}
+        title={`scaleId: ${getScale(value.scaleId).id}`}
+      >
         {refName(value)}
-        <span className="ml-2 font-mono text-xs text-muted-text">{getScale(value.scaleId).id}</span>
       </p>
     </fieldset>
   );

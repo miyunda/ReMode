@@ -1,9 +1,10 @@
-// `pnpm --filter @remode/web screenshots` → docs/screenshots/m2a/ (not part of the suite).
+// `pnpm --filter @remode/web screenshots` → docs/screenshots/m2b/ (not part of the suite).
+// docs/screenshots/m2a/ keeps the M2a set as it was when M2a merged.
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
-import { FIXTURES, expect, loadExample, open, test, useSourceMode } from './fixtures';
+import { expect, loadExample, open, test, useSourceMode } from './fixtures';
 
-const OUT = join(import.meta.dirname, '../../../docs/screenshots/m2a');
+const OUT = join(import.meta.dirname, '../../../docs/screenshots/m2b');
 
 for (const theme of ['light', 'dark'] as const) {
   test(`@screenshots ${theme}`, async ({ page, net }, info) => {
@@ -17,20 +18,32 @@ for (const theme of ['light', 'dark'] as const) {
       await page.screenshot({ path: join(OUT, `${device}-${theme}-${view}.png`) });
     };
 
-    // Import: multi-track MIDI with track list, import warning and validation.
-    await page.getByTestId('file-input').setInputFiles(join(FIXTURES, 'type0-multichannel.mid'));
-    await page.getByLabel(/选择 track-0/).check();
-    await expect(page.getByTestId('candidate').first()).toBeVisible();
-    await shot('import', page.locator('#source-title'));
-
-    // Analysis: the jianpu example (MISSING_DEGREES) with a manual source mode.
+    // Analysis with MISSING_DEGREES collapsed to one line.
     await loadExample(page);
     await useSourceMode(page, 'Ionian');
     await shot('analysis', page.locator('#analysis-title'));
 
-    // Diff: strict C Dorian with re-check and per-note table.
+    // Piano roll: strict C Dorian plus one manual edit (custom), the edited note selected.
     await page.getByRole('button', { name: '生成 Strict' }).click();
-    await expect(page.getByTestId('diff-table')).toBeVisible();
-    await shot('diff', page.locator('#inspector-title'));
+    await page.getByTestId('table-all').check();
+    await page.locator('[data-note-id="jianpu:n2"] button').click();
+    await page.getByTestId('piano-roll').focus();
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByTestId('inspector-reason')).toContainText('DEGREE_MAPPED');
+    await shot('roll', page.locator('#piano-roll-title'));
+    await shot('inspector', page.locator('#note-inspector-title'));
+
+    // New-melody mode with a few notes.
+    await page.getByTestId('new-melody').click();
+    await page.getByTestId('draft-quantum').selectOption({ label: '四分音符' });
+    await page.getByTestId('piano-roll').focus();
+    for (const s of [0, 2, 2, 3, 2, -2, -3, -2, -2]) {
+      await page.keyboard.press('Enter');
+      for (let k = 0; k < Math.abs(s); k++)
+        await page.keyboard.press(s > 0 ? 'ArrowUp' : 'ArrowDown');
+    }
+    await page.keyboard.press('Alt+ArrowRight');
+    await shot('new-melody', page.locator('#draft-title'));
   });
 }

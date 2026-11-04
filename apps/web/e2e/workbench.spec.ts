@@ -134,7 +134,20 @@ test('@phone layout has no horizontal scroll through the workflow', async ({ pag
   await useSourceMode(page, 'Ionian');
   await page.getByRole('button', { name: '生成 Strict' }).click();
   await expect(page.getByTestId('diff-table')).toBeVisible();
+  // The roll scrolls inside its own box; touch selects, the inspector edits.
+  const roll = page.getByTestId('piano-roll');
+  const rollBox = (await roll.boundingBox())!;
+  expect(rollBox.x + rollBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await roll.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
+  await page.locator('[data-note-id="jianpu:n1"] button').click();
+  await page.getByTestId('inspector-up').click();
+  await expect(page.getByTestId('inspector-pitch')).toContainText('E4 → F4');
+  await page.getByTestId('table-all').check();
   for (const d of await page.locator('details').all())
     await d.evaluate((e) => ((e as HTMLDetailsElement).open = true));
+  expect(await noOverflow()).toBe(true);
+
+  await page.getByTestId('new-melody').click();
+  await expect(page.getByTestId('piano-roll')).toBeVisible();
   expect(await noOverflow()).toBe(true);
 });

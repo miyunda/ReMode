@@ -17,7 +17,7 @@ export default defineConfig({
     baseURL: external ?? `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
   },
-  // `pnpm screenshots` regenerates docs/screenshots/m2a; it is not part of the suite.
+  // `pnpm screenshots` regenerates docs/screenshots/m2b; it is not part of the suite.
   ...(screenshots ? { grep: /@screenshots/ } : { grepInvert: /@screenshots/ }),
   projects: [
     {

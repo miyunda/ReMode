@@ -25,9 +25,9 @@ async function loadExample(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('workbench', () => {
-  it('shows placeholders for the later milestones', () => {
+  it('shows the piano roll and a placeholder for the M2c transport', () => {
     setup();
-    expect(screen.getByTestId('placeholder-piano-roll')).toHaveTextContent('M2b');
+    expect(screen.getByTestId('roll-empty')).toBeInTheDocument();
     expect(screen.getByTestId('placeholder-transport')).toHaveTextContent('M2c');
   });
 
@@ -67,7 +67,9 @@ describe('workbench', () => {
 
     await user.click(screen.getByRole('button', { name: '恢复自动识别' }));
     expect(screen.getByTestId('effective-source-mode')).toHaveTextContent('自动识别');
-    expect(screen.queryByTestId('diff-table')).not.toBeInTheDocument();
+    // The stale Strict variant is gone; the roll and table fall back to the original.
+    expect(screen.getByTestId('active-view')).toHaveTextContent('原曲');
+    expect(screen.getByTestId('view-generated')).toBeDisabled();
   });
 
   it('warns NO_CHARACTERISTIC_DEGREE for a target whose colour the melody never sounds', async () => {
@@ -154,7 +156,7 @@ describe('review fixes', () => {
     await user.type(field, '-');
     await user.click(screen.getByRole('button', { name: '生成 Strict' }));
     expect(screen.getByRole('alert')).toHaveTextContent('请输入');
-    expect(screen.queryByTestId('variant-summary')).not.toBeInTheDocument();
+    expect(screen.getByTestId('view-generated')).toBeDisabled();
     await user.clear(field);
     await user.type(field, '-99');
     await user.tab();

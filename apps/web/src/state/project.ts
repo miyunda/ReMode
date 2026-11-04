@@ -2,9 +2,16 @@
 // user's settings and the generated variant live in separate slots. The
 // reducer only calls pure core functions; anything time-dependent (the
 // variant's createdAt) arrives in the action, so the reducer stays pure.
+//
+// M2b adds the `custom` variant (manual pitch edits forked from the generated
+// variant or the original), the note selection, the new-melody draft and a
+// bounded undo/redo history over the user's settings and edits (spec §10.6).
 
 import {
+  MANUAL_EDIT,
+  MANUAL_EDIT_VERSION,
   analyzeMode,
+  applyManualEdit,
   mod,
   modeName,
   pitchName,
@@ -25,12 +32,23 @@ import {
   type MidiMetadata,
   type ModeAnalysis,
   type ModeRef,
+  type PitchChange,
+  type TransformSettings,
   type RecheckResult,
   type StrictRemodeReport,
   type TransformError,
   type TransformWarning,
   type ValidationReport,
 } from '@remode/core';
+import {
+  addNote,
+  deleteNote,
+  draftMelody,
+  emptyDraft,
+  updateNote,
+  type Draft,
+  type DraftSettings,
+} from '../lib/draft';
 import { WEB_LIMITS } from '../lib/limits';
 import type { LoadFailure, LoadIssue, LoadedInput } from '../lib/loadInput';
 
@@ -112,6 +130,22 @@ export type GeneratedVariant =
       errors: Array<Pick<TransformError, 'message' | 'noteIds'> & { code: string }>;
     };
 
+export type OkGenerated = Extract<GeneratedVariant, { ok: true }>;
+
+/** Which variant the piano roll draws filled and the note table lists. */
+export type ViewId = 'original' | 'generated' | 'custom';
+
+/** Manual edits (spec §10.3): a copy of the generated variant or the original, edited pitch by pitch. */
+export interface CustomVariant {
+  forkedFrom: 'original' | 'generated';
+  /** The generated variant it was forked from (kept when the target changes later). */
+  base: OkGenerated | null;
+  /** `variant.changes` are net changes against the original; manually touched notes carry MANUAL_EDIT. */
+  variant: MelodyVariant;
+  /** Every manual edit in order, each from the pitch before that edit. */
+  edits: PitchChange[];
+}
+
 export interface ProjectState {
   input: LoadedInput | null;
   loadFailure: LoadFailure | null;
@@ -130,7 +164,33 @@ export interface ProjectState {
   sourceOverride: ModeRef | null;
   target: TargetSettings;
   generated: GeneratedVariant | null;
+  custom: CustomVariant | null;
+  view: ViewId;
+  selectedNoteId: string | null;
+  /** Manual edits snap to the target scale (spec §10.3); off allows any semitone. */
+  snap: boolean;
+  /** New-melody mode; null otherwise. */
+  draft: Draft | null;
+  history: History;
 }
+
+/**
+ * The part of the state undo/redo restores (spec §10.6): the whole project,
+ * so replacing it (another file, 新建旋律, a track change) is undoable too.
+ * Not restored: the history itself, the snap preference, the selection and
+ * the last load error.
+ */
+export type Snapshot = Omit<ProjectState, 'history' | 'snap' | 'selectedNoteId' | 'loadFailure'>;
+
+export interface History {
+  past: readonly Snapshot[];
+  future: readonly Snapshot[];
+}
+
+/** Undo depth; older steps are dropped. */
+export const HISTORY_LIMIT = 100;
+
+const EMPTY_HISTORY: History = { past: [], future: [] };
 
 export const initialState: ProjectState = {
   input: null,
@@ -145,6 +205,12 @@ export const initialState: ProjectState = {
   sourceOverride: null,
   target: DEFAULT_TARGET,
   generated: null,
+  custom: null,
+  view: 'original',
+  selectedNoteId: null,
+  snap: true,
+  draft: null,
+  history: EMPTY_HISTORY,
 };
 
 export type Action =
@@ -155,7 +221,31 @@ export type Action =
   | { type: 'SET_SOURCE_OVERRIDE'; mode: ModeRef | null }
   | { type: 'SET_TARGET'; patch: Partial<TargetSettings> }
   | { type: 'GENERATE'; createdAt: number }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  // M2b: variants, selection and manual edits
+  | { type: 'SET_VIEW'; view: ViewId }
+  | { type: 'SELECT_NOTE'; noteId: string | null }
+  | { type: 'SET_SNAP'; snap: boolean }
+  | { type: 'FORK_CUSTOM'; from: 'original' | 'generated'; createdAt: number }
+  /** Edits the custom variant; from another view it first forks custom from that view. */
+  | { type: 'EDIT_PITCH'; noteId: string; toPitch: number; createdAt: number }
+  | { type: 'REVERT_NOTE'; noteId: string; createdAt: number }
+  /** 恢复原样: custom becomes an unedited copy of the original. */
+  | { type: 'RESTORE_ORIGINAL'; createdAt: number }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  // New-melody mode
+  | { type: 'NEW_MELODY'; settings?: DraftSettings }
+  | { type: 'DRAFT_SETTINGS'; patch: Partial<DraftSettings> }
+  | { type: 'DRAFT_ADD'; pitch: number; startTick: number; durationTick?: number }
+  | {
+      type: 'DRAFT_UPDATE';
+      noteId: string;
+      patch: Partial<Pick<MelodyNote, 'pitch' | 'startTick' | 'durationTick'>>;
+    }
+  | { type: 'DRAFT_DELETE'; noteId: string }
+  | { type: 'DRAFT_FINISH' }
+  | { type: 'DRAFT_CANCEL' };
 
 // ---------------------------------------------------------------------------
 
@@ -226,6 +316,9 @@ function select(state: ProjectState, trackId: string | null, repair: boolean): P
     analysis: null,
     sourceOverride: null,
     generated: null,
+    custom: null,
+    view: 'original',
+    selectedNoteId: null,
   };
   if (!input || trackId === null) return base;
   if (input.kind === 'midi') {
@@ -245,7 +338,7 @@ function select(state: ProjectState, trackId: string | null, repair: boolean): P
   let metadata: MidiMetadata;
   let validation: ValidationReport;
   let exportSource: OriginalMelody['exportSource'] = {};
-  if (input.kind === 'jianpu') {
+  if (input.kind === 'jianpu' || input.kind === 'new') {
     notes = input.melody.notes;
     metadata = input.melody.metadata;
     validation = validateMelody(notes, metadata);
@@ -384,33 +477,370 @@ function generate(state: ProjectState, createdAt: number): GeneratedVariant | nu
   };
 }
 
-export function reducer(state: ProjectState, action: Action): ProjectState {
+/** The target mode edits snap to: the generated target, else what the settings would produce. */
+export function targetMode(
+  state: Pick<ProjectState, 'analysis' | 'sourceOverride' | 'target' | 'generated'>,
+): (ModeRef & { name: string }) | null {
+  const g = state.generated;
+  if (g?.ok && g.operation === 'parallel-remode') return g.target;
+  const src = sourceMode(state);
+  if (!src.ok) return null;
+  const t = g?.ok
+    ? { ...state.target, operation: g.operation, semitones: g.semitones }
+    : state.target;
+  const ref: ModeRef =
+    t.operation === 'transpose'
+      ? { root: mod(src.mode.root + t.semitones, 12), scaleId: src.mode.scaleId }
+      : { root: t.root ?? src.mode.root, scaleId: t.scaleId };
+  return { ...ref, name: modeName(ref.root, ref.scaleId) };
+}
+
+export interface ActiveVariant {
+  id: ViewId;
+  notes: readonly MelodyNote[];
+  changes: readonly PitchChange[];
+  diff: DiffRow[];
+}
+
+/** The variant the roll draws filled; falls back to the original when the view has none. */
+export function activeVariant(state: ProjectState): ActiveVariant | null {
+  const original = state.original;
+  if (!original) return null;
+  if (state.view === 'custom' && state.custom) {
+    const v = state.custom.variant;
+    return { id: 'custom', notes: v.notes, changes: v.changes, diff: diffOf(original.notes, v) };
+  }
+  if (state.view === 'generated' && state.generated?.ok) {
+    const g = state.generated;
+    return { id: 'generated', notes: g.variant.notes, changes: g.variant.changes, diff: g.diff };
+  }
+  return { id: 'original', notes: original.notes, changes: [], diff: [] };
+}
+
+/** Net changes of `notes` against the original: manual notes as MANUAL_EDIT, the rest from the base. */
+function customChanges(
+  original: readonly MelodyNote[],
+  notes: readonly MelodyNote[],
+  base: OkGenerated | null,
+  edited: ReadonlySet<string>,
+): PitchChange[] {
+  const baseChanges = new Map((base?.variant.changes ?? []).map((c) => [c.noteId, c]));
+  const basePitch = new Map(base?.variant.notes.map((n) => [n.id, n.pitch]));
+  const out: PitchChange[] = [];
+  notes.forEach((n, i) => {
+    const from = (original[i] as MelodyNote).pitch;
+    if (n.pitch === from) return;
+    if (!edited.has(n.id)) {
+      const c = baseChanges.get(n.id);
+      if (c) out.push(c);
+      return;
+    }
+    const b = basePitch.get(n.id);
+    out.push({
+      noteId: n.id,
+      fromPitch: from,
+      toPitch: n.pitch,
+      reasonCode: MANUAL_EDIT,
+      explanation:
+        `手动修改：${pitchName(from)} → ${pitchName(n.pitch)}` +
+        (b !== undefined && b !== from && b !== n.pitch ? `（生成结果为 ${pitchName(b)}）` : ''),
+    });
+  });
+  return out;
+}
+
+function customVariant(
+  original: OriginalMelody,
+  base: OkGenerated | null,
+  notes: readonly MelodyNote[],
+  edits: PitchChange[],
+  createdAt: number,
+): CustomVariant {
+  const edited = new Set(edits.map((e) => e.noteId));
+  const transform: TransformSettings = {
+    operation: 'manual-edit',
+    version: MANUAL_EDIT_VERSION,
+    forkedFrom: base ? 'generated' : 'original',
+    base: base?.variant.transform ?? null,
+    edits: edits.length,
+  };
+  return deepFreeze<CustomVariant>({
+    forkedFrom: base ? 'generated' : 'original',
+    base,
+    variant: {
+      id: 'custom',
+      notes: [...notes],
+      createdAt,
+      transform,
+      changes: customChanges(original.notes, notes, base, edited),
+    },
+    edits,
+  });
+}
+
+function fork(
+  state: ProjectState,
+  from: 'original' | 'generated',
+  createdAt: number,
+): ProjectState {
+  const original = state.original;
+  if (!original) return state;
+  const base = from === 'generated' && state.generated?.ok ? state.generated : null;
+  if (from === 'generated' && !base) return state;
+  const notes = base ? base.variant.notes : original.notes;
+  return { ...state, custom: customVariant(original, base, notes, [], createdAt), view: 'custom' };
+}
+
+function editPitch(
+  state: ProjectState,
+  noteId: string,
+  toPitch: number,
+  createdAt: number,
+  explanation?: string,
+): ProjectState {
+  if (!state.original) return state;
+  let s = state;
+  if (s.view !== 'custom' || !s.custom) {
+    s = fork(s, s.view === 'generated' && s.generated?.ok ? 'generated' : 'original', createdAt);
+  }
+  const custom = s.custom;
+  if (!custom) return state;
+  const r = applyManualEdit(custom.variant.notes, noteId, toPitch, explanation);
+  if (!r.ok) return state;
+  return {
+    ...s,
+    custom: customVariant(
+      s.original as OriginalMelody,
+      custom.base,
+      r.notes,
+      [...custom.edits, r.change],
+      custom.variant.createdAt,
+    ),
+    selectedNoteId: noteId,
+  };
+}
+
+const snapshot = (s: ProjectState): Snapshot => ({
+  input: s.input,
+  trackId: s.trackId,
+  repair: s.repair,
+  validation: s.validation,
+  limitError: s.limitError,
+  repairPreview: s.repairPreview,
+  original: s.original,
+  analysis: s.analysis,
+  sourceOverride: s.sourceOverride,
+  target: s.target,
+  generated: s.generated,
+  custom: s.custom,
+  view: s.view,
+  draft: s.draft,
+});
+
+const sameSnapshot = (a: Snapshot, b: Snapshot): boolean =>
+  (Object.keys(a) as Array<keyof Snapshot>).every((k) => a[k] === b[k]);
+
+/** Actions that change what undo/redo restores. */
+const UNDOABLE: ReadonlySet<Action['type']> = new Set<Action['type']>([
+  // Replacing the project: a new file, another track, the repair toggle,
+  // 新建旋律, finishing or abandoning a draft, RESET.
+  'LOADED',
+  'SELECT_TRACK',
+  'SET_REPAIR',
+  'RESET',
+  'NEW_MELODY',
+  'DRAFT_FINISH',
+  'DRAFT_CANCEL',
+  'SET_SOURCE_OVERRIDE',
+  'SET_TARGET',
+  'GENERATE',
+  'FORK_CUSTOM',
+  'EDIT_PITCH',
+  'REVERT_NOTE',
+  'RESTORE_ORIGINAL',
+  'DRAFT_SETTINGS',
+  'DRAFT_ADD',
+  'DRAFT_UPDATE',
+  'DRAFT_DELETE',
+]);
+
+/** Undo/redo only touch the snapshot fields; the selection survives when its note still exists. */
+function restore(state: ProjectState, snap: Snapshot, history: History): ProjectState {
+  const next = { ...state, ...snap, history };
+  const ids = next.draft ? next.draft.notes : (next.original?.notes ?? []);
+  if (next.selectedNoteId && !ids.some((n) => n.id === next.selectedNoteId))
+    next.selectedNoteId = null;
+  return next;
+}
+
+/** The view after `generated` changed: a vanished generated variant falls back to the original. */
+const viewAfter = (s: ProjectState): ViewId =>
+  s.view === 'generated' && !s.generated?.ok ? 'original' : s.view;
+
+function apply(state: ProjectState, action: Action): ProjectState {
   switch (action.type) {
     case 'LOADED': {
       const input = action.input;
-      const fresh: ProjectState = { ...initialState, target: state.target, input };
+      const fresh: ProjectState = {
+        ...initialState,
+        snap: state.snap,
+        target: state.target,
+        input,
+      };
       // Auto-select only when there is exactly one candidate (spec §5.1).
       const only =
-        input.kind === 'jianpu'
-          ? 'jianpu'
+        input.kind === 'jianpu' || input.kind === 'new'
+          ? input.kind
           : input.candidates.length === 1
             ? (input.candidates[0]?.id ?? null)
             : null;
       return select(fresh, only, false);
     }
     case 'LOAD_FAILED':
-      return { ...initialState, target: state.target, loadFailure: action.failure };
+      // A file that cannot be read never replaces the current project.
+      return { ...state, loadFailure: action.failure };
     case 'SELECT_TRACK':
       return select(state, action.trackId, false);
     case 'SET_REPAIR':
       return state.trackId === null ? state : select(state, state.trackId, action.repair);
-    case 'SET_SOURCE_OVERRIDE':
-      return { ...state, sourceOverride: action.mode, generated: null };
-    case 'SET_TARGET':
-      return { ...state, target: { ...state.target, ...action.patch }, generated: null };
-    case 'GENERATE':
-      return { ...state, generated: generate(state, action.createdAt) };
+    case 'SET_SOURCE_OVERRIDE': {
+      const s = { ...state, sourceOverride: action.mode, generated: null };
+      return { ...s, view: viewAfter(s) };
+    }
+    case 'SET_TARGET': {
+      const patch = action.patch as Record<string, unknown>;
+      const cur = state.target as unknown as Record<string, unknown>;
+      if (Object.keys(patch).every((k) => patch[k] === cur[k])) return state;
+      const s = { ...state, target: { ...state.target, ...action.patch }, generated: null };
+      return { ...s, view: viewAfter(s) };
+    }
+    case 'GENERATE': {
+      const generated = generate(state, action.createdAt);
+      const s = { ...state, generated };
+      return { ...s, view: generated?.ok ? 'generated' : viewAfter(s) };
+    }
     case 'RESET':
-      return { ...initialState, target: state.target };
+      return { ...initialState, snap: state.snap, target: state.target };
+
+    case 'SET_VIEW': {
+      const ok =
+        action.view === 'original' ||
+        (action.view === 'generated' && state.generated?.ok) ||
+        (action.view === 'custom' && state.custom);
+      return ok && state.original ? { ...state, view: action.view } : state;
+    }
+    case 'SELECT_NOTE':
+      return { ...state, selectedNoteId: action.noteId };
+    case 'SET_SNAP':
+      return { ...state, snap: action.snap };
+    case 'FORK_CUSTOM':
+      return fork(state, action.from, action.createdAt);
+    case 'EDIT_PITCH':
+      return editPitch(state, action.noteId, action.toPitch, action.createdAt);
+    case 'REVERT_NOTE': {
+      const n = state.original?.notes.find((x) => x.id === action.noteId);
+      return n
+        ? editPitch(
+            state,
+            action.noteId,
+            n.pitch,
+            action.createdAt,
+            `恢复原音：${pitchName(n.pitch)}`,
+          )
+        : state;
+    }
+    case 'RESTORE_ORIGINAL':
+      return fork(state, 'original', action.createdAt);
+    case 'UNDO':
+    case 'REDO':
+      return state; // handled in reducer()
+
+    case 'NEW_MELODY':
+      return {
+        ...initialState,
+        snap: state.snap,
+        target: state.target,
+        draft: emptyDraft(action.settings),
+      };
+    case 'DRAFT_SETTINGS': {
+      const d = state.draft;
+      if (!d) return state;
+      return { ...state, draft: { ...d, settings: { ...d.settings, ...action.patch } } };
+    }
+    case 'DRAFT_ADD': {
+      const d = state.draft;
+      if (!d) return state;
+      const next = addNote(d, action);
+      if (next === d) return state;
+      return { ...state, draft: next, selectedNoteId: `draft:${d.nextId}` };
+    }
+    case 'DRAFT_UPDATE': {
+      const d = state.draft;
+      if (!d) return state;
+      const next = updateNote(d, action.noteId, action.patch);
+      return next === d ? state : { ...state, draft: next };
+    }
+    case 'DRAFT_DELETE': {
+      const d = state.draft;
+      if (!d) return state;
+      const next = deleteNote(d, action.noteId);
+      if (next === d) return state;
+      return {
+        ...state,
+        draft: next,
+        selectedNoteId: state.selectedNoteId === action.noteId ? null : state.selectedNoteId,
+      };
+    }
+    case 'DRAFT_FINISH': {
+      const d = state.draft;
+      if (!d || d.notes.length === 0) return state;
+      const melody = draftMelody(d);
+      const loaded = apply(
+        { ...state, draft: null },
+        {
+          type: 'LOADED',
+          input: {
+            kind: 'new',
+            fileName: null,
+            melody: { ...melody, warnings: [] },
+            keyPitchClass: d.settings.keyPc,
+          },
+        },
+      );
+      return loaded;
+    }
+    case 'DRAFT_CANCEL':
+      return state.draft ? { ...initialState, snap: state.snap, target: state.target } : state;
   }
+}
+
+export function reducer(state: ProjectState, action: Action): ProjectState {
+  const { past, future } = state.history;
+  if (action.type === 'UNDO') {
+    const prev = past[past.length - 1];
+    if (!prev) return state;
+    return restore(state, prev, {
+      past: past.slice(0, -1),
+      future: [snapshot(state), ...future].slice(0, HISTORY_LIMIT),
+    });
+  }
+  if (action.type === 'REDO') {
+    const next = future[0];
+    if (!next) return state;
+    return restore(state, next, {
+      past: [...past, snapshot(state)].slice(-HISTORY_LIMIT),
+      future: future.slice(1),
+    });
+  }
+  // History is managed here only; `apply` never touches it.
+  const applied = apply(state, action);
+  if (applied === state) return state;
+  const next = applied.history === state.history ? applied : { ...applied, history: state.history };
+  if (!UNDOABLE.has(action.type)) return next;
+  const before = snapshot(state);
+  if (sameSnapshot(before, snapshot(next))) return next;
+  return {
+    ...next,
+    history: { past: [...past, before].slice(-HISTORY_LIMIT), future: [] },
+  };
 }

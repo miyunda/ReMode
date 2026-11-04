@@ -46,7 +46,7 @@ export type VariantId = 'original' | 'strict' | 'expressive' | 'custom';
 
 /** Transform settings are defined in M1 (spec §7); M0 only reserves the slot. */
 export interface TransformSettings {
-  operation: 'parallel-remode' | 'transpose' | 'relative-recenter';
+  operation: 'parallel-remode' | 'transpose' | 'relative-recenter' | 'manual-edit';
   [key: string]: unknown;
 }
 

@@ -10,12 +10,13 @@ runs in the browser. There is no backend and no AI.
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M2a (web import and analysis).** M0 added MIDI import, monophony
+**Status: milestone M2b (piano roll and manual editing).** M0 added MIDI import, monophony
 validation and mode analysis. M1a added jianpu (numbered notation) input and MIDI export.
 M1b added chromatic transpose and the strict parallel remode (same tonic, new mode). M2a adds
 the browser workbench: import, analysis, source-mode correction, Strict generation, a
-per-note diff and MIDI download. The piano roll (M2b), playback (M2c) and the Expressive
-optimiser (M3) come later.
+per-note diff and MIDI download. M2b adds the piano roll, a note inspector, manual pitch
+editing (the `custom` variant) with undo/redo, and a new-melody mode. Playback (M2c) and the
+Expressive optimiser (M3) come later.
 
 ## Repository layout
 
@@ -213,7 +214,7 @@ pnpm build                            # builds every package; the site goes to a
 pnpm preview                          # serves apps/web/dist with the production headers (CSP)
 pnpm --filter @remode/web exec playwright install --with-deps chromium   # once per machine
 pnpm e2e                              # builds the site, then runs the Playwright suite
-pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2a/
+pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2b/
 ```
 
 What M2a does: import `.mid` / `.midi` / `.jianpu` / `.txt` (drag-and-drop or picker) or
@@ -225,7 +226,36 @@ degrees, out-of-set notes, ambiguity codes, a pitch-class chart with a data tabl
 `analysisVersion`); set the source mode by hand (church modes by root, Chinese modes as
 宫系统 + 主音), which overrides detection and is marked as manual; generate a Strict parallel
 remode or a transpose; and download the result as MIDI. No percentage or confidence is shown
-anywhere. The piano roll and playback areas are labelled placeholders.
+anywhere.
+
+What M2b adds (details in
+[`docs/decisions/m2b-implementation-notes.md`](docs/decisions/m2b-implementation-notes.md)):
+
+- **Piano roll** (canvas): bar/beat grid from the time signatures, a keyboard gutter, source
+  and target scale rows (toggleable) with tonic rows marked, phrase markers, the original as
+  dashed ghost outlines and the active variant filled. Changed notes are hatched and joined to
+  the original pitch by a connector (cross-hatch for manual edits, `!` for notes outside the
+  target scale), so no change is shown by colour alone. It has zoom buttons, Ctrl/⌘+wheel
+  zoom and fit-to-melody. A synchronized note table is the screen-reader alternative.
+- **Views:** 原曲 | Strict (or 移调结果) | Expressive (M3, disabled) | Custom.
+- **Note inspector:** ID, bar.beat, original → current pitch, degree in the source and target
+  modes, the reason code, step buttons and “恢复此音”.
+- **Manual editing** only changes pitch. Drag a note vertically, use ↑/↓ on the focused roll
+  (Shift+↑/↓ for an octave), or use the inspector buttons. Edits snap to the target scale
+  unless you turn snapping off. The first edit forks `custom` from the variant on screen.
+  Every edit is a `MANUAL_EDIT` change (`remode-manual/1.0.1`), and ticks, IDs and velocity
+  never change. Undo/redo (buttons, Ctrl/⌘+Z, Shift+Ctrl/⌘+Z, Ctrl+Y) covers edits, reverts,
+  target and source settings, generation, and replacing the project (another file, another
+  track, 新建旋律), up to 100 steps. A file that fails to load never replaces the current project. “恢复原样” resets Custom to the
+  original pitches.
+- **New-melody mode** (“新建旋律”): set the key, time signature, tempo and grid, then add
+  notes by click or Enter, move and resize them, and delete them. “完成并分析” makes the
+  notes the immutable Original.
+- **Downloads:** MIDI for the variant on screen (`<source>-<root>-<mode>-custom.mid` for a
+  custom forked from Strict), and **jianpu text** (`writeJianpu`, the inverse of the parser;
+  if the timing cannot be written exactly it reports an error code and never rounds).
+- The long `MISSING_DEGREES` detail is collapsed to one line. The roll scrolls inside its own
+  box, so the page never scrolls sideways at phone width.
 
 **Limits** (initial values; measurements in
 [`docs/decisions/m2a-implementation-notes.md`](docs/decisions/m2a-implementation-notes.md)):
