@@ -1,10 +1,10 @@
-// `pnpm --filter @remode/web screenshots` → docs/screenshots/m2b/ (not part of the suite).
-// docs/screenshots/m2a/ keeps the M2a set as it was when M2a merged.
+// `pnpm --filter @remode/web screenshots` → docs/screenshots/m2c/ (not part of the suite).
+// docs/screenshots/m2a/ and m2b/ keep those sets as they were at their merges.
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, loadExample, open, test, useSourceMode } from './fixtures';
 
-const OUT = join(import.meta.dirname, '../../../docs/screenshots/m2b');
+const OUT = join(import.meta.dirname, '../../../docs/screenshots/m2c');
 
 for (const theme of ['light', 'dark'] as const) {
   test(`@screenshots ${theme}`, async ({ page, net }, info) => {
@@ -33,6 +33,18 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByTestId('inspector-reason')).toContainText('DEGREE_MAPPED');
     await shot('roll', page.locator('#piano-roll-title'));
     await shot('inspector', page.locator('#note-inspector-title'));
+
+    // Transport: paused mid-melody with a loop range and the drone on.
+    await page.getByTestId('play').click();
+    await expect(page.getByTestId('transport')).toHaveAttribute('data-status', 'playing');
+    await page.getByTestId('play').click();
+    await page.getByTestId('position-slider').fill('960');
+    await page.keyboard.press('[');
+    await page.getByTestId('position-slider').fill('2880');
+    await page.keyboard.press(']');
+    await page.getByTestId('position-slider').fill('1440');
+    await expect(page.getByTestId('loop-toggle')).toHaveAttribute('aria-pressed', 'true');
+    await shot('transport', page.locator('#transport-title'));
 
     // New-melody mode with a few notes.
     await page.getByTestId('new-melody').click();

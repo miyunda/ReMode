@@ -10,13 +10,13 @@ runs in the browser. There is no backend and no AI.
 The spec is in [`docs/ReMode-Development-Plan.md`](docs/ReMode-Development-Plan.md) and the
 project rules are in [`CLAUDE.md`](CLAUDE.md).
 
-**Status: milestone M2b (piano roll and manual editing).** M0 added MIDI import, monophony
+**Status: milestone M2c (playback, drone and note audition).** M0 added MIDI import, monophony
 validation and mode analysis. M1a added jianpu (numbered notation) input and MIDI export.
 M1b added chromatic transpose and the strict parallel remode (same tonic, new mode). M2a adds
 the browser workbench: import, analysis, source-mode correction, Strict generation, a
 per-note diff and MIDI download. M2b adds the piano roll, a note inspector, manual pitch
-editing (the `custom` variant) with undo/redo, and a new-melody mode. Playback (M2c) and the
-Expressive optimiser (M3) come later.
+editing (the `custom` variant) with undo/redo, and a new-melody mode. M2c adds playback, a
+tonic drone and note audition. The Expressive optimiser (M3) comes later.
 
 ## Repository layout
 
@@ -203,7 +203,7 @@ and a stable ID `jianpu:n<k>`. The full rules are in spec §10.8.1.
 generation, export) runs in the browser through `@remode/core`.
 
 **Privacy.** Files and jianpu text are read and processed only in your browser. Nothing is
-uploaded, nothing is stored (only the theme choice is saved, in `localStorage`), and the
+uploaded, nothing is stored (only the theme and audio preferences are saved, in `localStorage`), and the
 app makes no network requests after its own static files have loaded. The E2E suite checks
 this, and the Content Security Policy (`connect-src 'self'`, self-only scripts and styles,
 no external fonts) enforces it.
@@ -214,7 +214,7 @@ pnpm build                            # builds every package; the site goes to a
 pnpm preview                          # serves apps/web/dist with the production headers (CSP)
 pnpm --filter @remode/web exec playwright install --with-deps chromium   # once per machine
 pnpm e2e                              # builds the site, then runs the Playwright suite
-pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2b/
+pnpm --filter @remode/web screenshots # regenerates docs/screenshots/m2c/
 ```
 
 What M2a does: import `.mid` / `.midi` / `.jianpu` / `.txt` (drag-and-drop or picker) or
@@ -256,6 +256,29 @@ What M2b adds (details in
   if the timing cannot be written exactly it reports an error code and never rounds).
 - The long `MISSING_DEGREES` detail is collapsed to one line. The roll scrolls inside its own
   box, so the page never scrolls sideways at phone width.
+
+What M2c adds (details in
+[`docs/decisions/m2c-implementation-notes.md`](docs/decisions/m2c-implementation-notes.md)):
+
+- **Transport:** play/pause (Space), stop, a position slider, click the roll ruler to seek, a
+  moving playhead, master volume and three synth timbres. Time comes from the tick-based tempo
+  map, so tempo changes are honoured. Audio starts on your first gesture, and nothing is
+  downloaded for it.
+- **One position for every variant:** switching between 原曲, Strict and Custom during playback
+  keeps the position, releases what is sounding and continues with the new variant.
+- **Loop:** drag along the ruler, or set the edges at the playhead with `[` and `]`. `L` toggles
+  it.
+- **Tonic drone** (ADR-014): 仅主音 or 主音 + 五度, with its own volume, following the selected
+  variant's tonic. On by default, playback only, never exported. With an undetermined tonic it
+  stays silent and says why.
+- **Note audition:** a short note when you select or add a note and when its pitch changes (once
+  per pitch during a drag). Clicking the keyboard gutter sounds that pitch. “试听音符” turns it
+  off, and it is silent during playback. New-melody drafts get audition and playback without
+  pressing 完成并分析.
+
+**Headless tests cannot verify how any of this sounds.** They check scheduling against a fake
+backend and transport state in a real browser, so a human listening check is required before
+merging audio changes.
 
 **Limits** (initial values; measurements in
 [`docs/decisions/m2a-implementation-notes.md`](docs/decisions/m2a-implementation-notes.md)):
