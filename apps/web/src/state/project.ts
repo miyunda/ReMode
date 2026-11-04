@@ -495,6 +495,31 @@ export function targetMode(
   return { ...ref, name: modeName(ref.root, ref.scaleId) };
 }
 
+/** The mode a generated variant ends up in; a transposed one is the source mode moved with it. */
+function generatedMode(state: ProjectState, g: OkGenerated): ModeRef | null {
+  if (g.operation === 'parallel-remode') return g.target;
+  const src = sourceMode(state);
+  return src.ok ? { root: mod(src.mode.root + g.semitones, 12), scaleId: src.mode.scaleId } : null;
+}
+
+/**
+ * The mode of what is selected (the drone's tonic, spec §10.4). Null when it is
+ * not determined: an ambiguous source is not guessed at, it is resolved in SOURCE.
+ * A draft has only its key (1=).
+ */
+export function variantMode(state: ProjectState): ModeRef | null {
+  if (state.draft) return { root: state.draft.settings.keyPc, scaleId: 'ionian' };
+  const base =
+    state.view === 'custom' && state.custom
+      ? state.custom.base
+      : state.view === 'generated' && state.generated?.ok
+        ? state.generated
+        : null;
+  if (base) return generatedMode(state, base);
+  const src = sourceMode(state);
+  return src.ok ? src.mode : null;
+}
+
 export interface ActiveVariant {
   id: ViewId;
   notes: readonly MelodyNote[];

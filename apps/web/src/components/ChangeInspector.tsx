@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { inMode, mod, recheckTarget, writeJianpu, type RecheckResult } from '@remode/core';
+import { useEngine } from '../audio/AudioProvider';
 import { signed } from '../lib/format';
 import { downloadBytes, downloadText, exportView, type VariantExport } from '../lib/exportVariant';
 import { activeVariant, targetMode } from '../state/project';
@@ -40,6 +41,7 @@ const VIEW_NAMES = { original: '原曲', generated: 'Strict', custom: 'Custom' }
 export function ChangeInspector() {
   const state = useProject();
   const dispatch = useDispatch();
+  const engine = useEngine();
   const { generated, original, custom, view, selectedNoteId, input } = state;
   const [exported, setExported] = useState<VariantExport | null>(null);
   const [jianpu, setJianpu] = useState<ReturnType<typeof writeJianpu> | null>(null);
@@ -223,7 +225,11 @@ export function ChangeInspector() {
         meta={original.metadata}
         target={active.id === 'original' ? null : tgt}
         selectedId={selectedNoteId}
-        onSelect={(id) => dispatch({ type: 'SELECT_NOTE', noteId: id })}
+        onSelect={(id) => {
+          dispatch({ type: 'SELECT_NOTE', noteId: id });
+          const note = active.notes.find((n) => n.id === id);
+          if (note) engine.audition(note.pitch);
+        }}
       />
 
       {exported && (

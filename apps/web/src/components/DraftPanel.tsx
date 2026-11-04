@@ -1,6 +1,14 @@
 import { useId, useMemo, useState } from 'react';
 import { pitchName, writeJianpu } from '@remode/core';
-import { DRAFT_LIMITS, QUANTA, TIME_SIGNATURES, draftMelody } from '../lib/draft';
+import { useRollAudio } from '../audio/AudioProvider';
+import {
+  DRAFT_LIMITS,
+  QUANTA,
+  TIME_SIGNATURES,
+  addNote,
+  draftMelody,
+  updateNote,
+} from '../lib/draft';
 import { downloadText } from '../lib/exportVariant';
 import { barBeat, beats } from '../lib/format';
 import { PITCH_CLASSES } from '../lib/modes';
@@ -14,6 +22,7 @@ const NO_CHANGES = new Map();
 export function DraftPanel() {
   const { draft, selectedNoteId, history } = useProject();
   const dispatch = useDispatch();
+  const rollAudio = useRollAudio();
   const ids = { key: useId(), sig: useId(), bpm: useId(), q: useId() };
   const [jianpu, setJianpu] = useState<ReturnType<typeof writeJianpu> | null>(null);
   // Text being typed; null when not editing, so the field follows the draft (and undo).
@@ -41,6 +50,14 @@ export function DraftPanel() {
   const set = (patch: Partial<typeof s>) => dispatch({ type: 'DRAFT_SETTINGS', patch });
   const sel = draft.notes.find((n) => n.id === selectedNoteId);
   const keyMode = { root: s.keyPc, scaleId: 'ionian' };
+  const add = (pitch: number, startTick: number) => {
+    dispatch({ type: 'DRAFT_ADD', pitch, startTick });
+    return addNote(draft, { pitch, startTick }) !== draft;
+  };
+  const update = (noteId: string, patch: Parameters<typeof updateNote>[2]) => {
+    dispatch({ type: 'DRAFT_UPDATE', noteId, patch });
+    return updateNote(draft, noteId, patch) !== draft;
+  };
   const exportJianpu = () => {
     const m = draftMelody(draft);
     const r = writeJianpu(m.notes, m.metadata, { keyPitchClass: s.keyPc });
@@ -188,10 +205,11 @@ export function DraftPanel() {
         onSelect={(id) => dispatch({ type: 'SELECT_NOTE', noteId: id })}
         quantum={s.quantum}
         minTicks={8 * ((480 * 4 * s.numerator) / s.denominator)}
-        onAdd={(pitch, startTick) => dispatch({ type: 'DRAFT_ADD', pitch, startTick })}
-        onUpdate={(noteId, patch) => dispatch({ type: 'DRAFT_UPDATE', noteId, patch })}
+        onAdd={add}
+        onUpdate={update}
         onDelete={(noteId) => dispatch({ type: 'DRAFT_DELETE', noteId })}
         fitKey={fitKey}
+        {...rollAudio}
       />
       <p className="text-xs text-muted-text">
         左栏 ■ 标出 {PITCH_CLASSES[s.keyPc]?.name} 大调（1=
@@ -223,7 +241,9 @@ export function DraftPanel() {
               key={label}
               type="button"
               className="btn px-2 py-0.5"
-              onClick={() => dispatch({ type: 'DRAFT_UPDATE', noteId: sel.id, patch })}
+              onClick={() => {
+                if (update(sel.id, patch) && 'pitch' in patch) rollAudio.onAudition(patch.pitch);
+              }}
             >
               <span aria-hidden="true">{sym}</span> {label}
             </button>

@@ -142,3 +142,7 @@ export const timeOrderOf = (notes: readonly Pick<MelodyNote, 'startTick'>[]): nu
 
 export const snapTick = (tick: number, quantum: number) =>
   Math.max(0, Math.floor(tick / quantum) * quantum);
+
+/** Nearest grid tick (ruler seek and loop edges). */
+export const nearestTick = (tick: number, quantum: number) =>
+  Math.max(0, Math.round(tick / quantum) * quantum);

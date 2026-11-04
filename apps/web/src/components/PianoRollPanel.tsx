@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { inMode, snapPitch, stepPitch, type MelodyNote } from '@remode/core';
+import { useRollAudio } from '../audio/AudioProvider';
 import { activeVariant, sourceMode, targetMode, type ViewId } from '../state/project';
 import { useDispatch, useProject } from '../state/ProjectContext';
 import { RollCanvas } from './RollCanvas';
@@ -69,6 +70,7 @@ function Legend() {
 export function PianoRollPanel() {
   const state = useProject();
   const dispatch = useDispatch();
+  const rollAudio = useRollAudio();
   const { original, analysis, generated, custom, view, selectedNoteId, snap, history } = state;
   const [showSource, setShowSource] = useState(true);
   const [showTarget, setShowTarget] = useState(true);
@@ -274,6 +276,7 @@ export function PianoRollPanel() {
           ? { outOfTarget: (p: number) => !inMode(p, tgt) }
           : {})}
         fitKey={original}
+        {...rollAudio}
       />
       <Legend />
     </Section>

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ANALYSIS_VERSION, JIANPU_PARSER_VERSION, STRICT_TRANSFORM_VERSION } from '@remode/core';
+import { AudioProvider, ProgramSync } from './audio/AudioProvider';
+import type { PlaybackEngine } from './audio/engine';
 import { AnalysisView } from './components/AnalysisView';
 import { ChangeInspector } from './components/ChangeInspector';
 import { DraftPanel } from './components/DraftPanel';
@@ -9,6 +11,7 @@ import { PianoRollPanel } from './components/PianoRollPanel';
 import { SourceModeCard } from './components/SourceModeCard';
 import { TargetPanel } from './components/TargetPanel';
 import { TrackList } from './components/TrackList';
+import { TransportPanel } from './components/TransportPanel';
 import { ValidationView } from './components/ValidationView';
 import { Section } from './components/ui';
 import { applyThemePref, readThemePref, saveThemePref, type ThemePref } from './lib/theme';
@@ -66,32 +69,6 @@ function Header() {
   );
 }
 
-/** A clearly labelled slot that a later milestone fills. */
-function Placeholder({
-  id,
-  title,
-  milestone,
-  text,
-}: {
-  id: string;
-  title: string;
-  milestone: string;
-  text: string;
-}) {
-  return (
-    <section
-      aria-labelledby={`${id}-title`}
-      data-testid={`placeholder-${id}`}
-      className="flex flex-col justify-center gap-1 rounded-xl border-2 border-dashed border-hl-high p-4"
-    >
-      <h2 id={`${id}-title`} className="panel-title">
-        {title} <span className="normal-case tracking-normal">· 待实现（{milestone}）</span>
-      </h2>
-      <p className="text-sm text-muted-text">{text}</p>
-    </section>
-  );
-}
-
 /** Ctrl/Cmd+Z undo, Shift+Ctrl/Cmd+Z or Ctrl+Y redo; text fields keep their own undo. */
 function useUndoShortcuts() {
   const dispatch = useDispatch();
@@ -139,20 +116,9 @@ function Workbench() {
           </Section>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          {draft ? (
-            <DraftPanel />
-          ) : (
-            <>
-              <PianoRollPanel />
-              <NoteInspector />
-            </>
-          )}
-          <Placeholder
-            id="transport"
-            title="Transport"
-            milestone="M2c"
-            text="Original | Strict 切换、播放 / 暂停 / 定位 / 循环、主音持续低音（drone）。"
-          />
+          {draft ? <DraftPanel /> : <PianoRollPanel />}
+          <TransportPanel />
+          {!draft && <NoteInspector />}
           <ChangeInspector />
           <AnalysisView />
         </div>
@@ -169,10 +135,13 @@ function Workbench() {
   );
 }
 
-export function App() {
+export function App({ engine }: { engine?: PlaybackEngine }) {
   return (
     <ProjectProvider>
-      <Workbench />
+      <AudioProvider {...(engine ? { engine } : {})}>
+        <ProgramSync />
+        <Workbench />
+      </AudioProvider>
     </ProjectProvider>
   );
 }
