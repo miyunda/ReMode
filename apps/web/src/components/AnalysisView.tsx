@@ -67,8 +67,9 @@ function CandidateCard({ c, noteIndex }: { c: ModeCandidate; noteIndex: Map<stri
         <span className="rounded bg-overlay px-1.5 py-0.5 text-xs font-semibold">
           第 {c.rank} 名
         </span>
-        <strong className="text-base">{c.name}</strong>
-        <code className="text-xs text-muted-text">{c.scaleId}</code>
+        <strong className="text-base" title={`scaleId: ${c.scaleId}`}>
+          {c.name}
+        </strong>
         <span className="text-xs text-muted-text">证据点数合计 {c.evidencePoints}</span>
       </div>
       {c.aliases.length > 0 && (

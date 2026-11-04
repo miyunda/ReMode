@@ -107,7 +107,7 @@ describe('loading', () => {
     expect(s.original).toBeNull();
   });
 
-  it('LOAD_FAILED clears the previous project but keeps target settings', () => {
+  it('LOAD_FAILED shows the error and keeps the current project', () => {
     const s = run(
       { type: 'LOADED', input: loadExample() },
       { type: 'SET_TARGET', patch: { scaleId: 'lydian' } },
@@ -121,7 +121,7 @@ describe('loading', () => {
         },
       },
     );
-    expect(s.original).toBeNull();
+    expect(s.original?.notes).toHaveLength(21);
     expect(s.loadFailure?.errors[0]?.code).toBe('READ_FAILED');
     expect(s.target.scaleId).toBe('lydian');
   });

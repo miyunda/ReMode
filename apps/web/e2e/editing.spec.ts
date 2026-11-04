@@ -1,9 +1,10 @@
 // M2b: piano roll selection, the inspector, manual editing, undo/redo,
 // custom MIDI download and new-melody mode.
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { importMidi, parseJianpu } from '@remode/core';
 import { JIANPU_EXAMPLE } from '../src/components/ImportPanel';
-import { expect, loadExample, open, test, useSourceMode } from './fixtures';
+import { FIXTURES, expect, loadExample, open, test, useSourceMode } from './fixtures';
 
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -143,4 +144,30 @@ test('new-melody mode: draw a melody, analyse it and generate', async ({ page, n
   await page.getByTestId('table-all').check();
   await expect(page.getByTestId('diff-table').locator('tbody tr')).toHaveCount(9);
   await expect(page.getByTestId('diff-table')).toContainText('new:n8');
+});
+
+test('replacing a project is undoable; a bad file never replaces it', async ({ page, net }) => {
+  await open(page, net);
+  await loadExample(page);
+  await useSourceMode(page, 'Ionian');
+  await page.getByRole('button', { name: '生成 Strict' }).click();
+  await page.locator('[data-note-id="jianpu:n1"] button').click();
+  await page.getByTestId('inspector-up').click();
+  await expect(page.getByTestId('inspector-pitch')).toContainText('E4 → F4');
+
+  // A malformed file shows its error and leaves the edited project alone.
+  await page.getByTestId('file-input').setInputFiles(join(FIXTURES, 'malformed-not-midi.mid'));
+  await expect(page.getByTestId('load-failure')).toContainText('NOT_MIDI');
+  await expect(page.getByTestId('view-custom')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('inspector-pitch')).toContainText('E4 → F4');
+
+  // 新建旋律 replaces it; one undo brings back original, Strict and the custom edit.
+  await page.getByTestId('new-melody').click();
+  await expect(page.getByTestId('draft-finish')).toBeVisible();
+  await page.keyboard.press(`${mod}+z`);
+  await expect(page.getByTestId('view-custom')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('changed-count')).toHaveText('5');
+  await page.locator('[data-note-id="jianpu:n1"] button').click();
+  await expect(page.getByTestId('inspector-pitch')).toContainText('E4 → F4');
+  await expect(page.getByTestId('view-generated')).toBeEnabled();
 });

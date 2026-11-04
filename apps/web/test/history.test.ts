@@ -12,7 +12,7 @@ import {
   type Action,
   type ProjectState,
 } from '../src/state/project';
-import { loadExample } from './helpers';
+import { loadExample, loadFixture } from './helpers';
 
 const run = (...actions: Action[]): ProjectState => actions.reduce(reducer, initialState);
 const C_IONIAN = { root: 0, scaleId: 'ionian' };
@@ -61,7 +61,7 @@ describe('custom variant', () => {
     expect(timing(s.custom!.variant.notes)).toEqual(timing(s.original!.notes));
     expect(s.custom!.variant.transform).toMatchObject({
       operation: 'manual-edit',
-      version: 'remode-manual/1.0.0',
+      version: 'remode-manual/1.0.1',
       forkedFrom: 'generated',
     });
     // Strict itself is untouched.
@@ -74,7 +74,7 @@ describe('custom variant', () => {
     const s = reducer(s0, { type: 'REVERT_NOTE', noteId: e.id, createdAt: 2 });
     expect(s.custom!.variant.notes.find((n) => n.id === e.id)?.pitch).toBe(64);
     expect(s.custom!.variant.changes).toHaveLength(4);
-    expect(s.custom!.edits[0]?.explanation).toMatch(/Reverted/);
+    expect(s.custom!.edits[0]?.explanation).toBe('恢复原音：E4');
   });
 
   it('恢复原样 makes custom an unedited copy of the original, undoably', () => {
@@ -134,7 +134,7 @@ describe('undo / redo', () => {
     const s1 = strict();
     const s2 = reducer(s1, { type: 'EDIT_PITCH', noteId: 'jianpu:n0', toPitch: 62, createdAt: 2 });
     const s3 = reducer(s2, { type: 'SET_TARGET', patch: { scaleId: 'aeolian' } });
-    expect(s3.history.past).toHaveLength(4); // override, generate, edit, target
+    expect(s3.history.past).toHaveLength(5); // load, override, generate, edit, target
 
     const u1 = reducer(s3, { type: 'UNDO' });
     expect(u1.target.scaleId).toBe('dorian');
@@ -177,10 +177,10 @@ describe('undo / redo', () => {
     expect(s.history.past).toHaveLength(HISTORY_LIMIT);
   });
 
-  it('loading something else clears the history', () => {
-    const s = reducer(strict(), { type: 'LOADED', input: loadExample() });
-    expect(s.history).toEqual({ past: [], future: [] });
-    expect(s.custom).toBeNull();
+  it('a fresh load starts with the load itself as the only undo step', () => {
+    const s = reducer(initialState, { type: 'LOADED', input: loadExample() });
+    expect(s.history.past).toHaveLength(1);
+    expect(reducer(s, { type: 'UNDO' }).original).toBeNull();
   });
 });
 
@@ -280,7 +280,10 @@ describe('new-melody mode', () => {
     expect(Object.isFrozen(s.original?.notes[0])).toBe(true);
     expect(s.original?.metadata.tempoMap).toEqual([{ tick: 0, bpm: 100 }]);
     expect(s.analysis?.candidates.length).toBeGreaterThan(0);
-    expect(s.history.past).toEqual([]);
+    // Finishing is one undo step back to the draft.
+    const back = reducer(s, { type: 'UNDO' });
+    expect(back.draft?.notes).toHaveLength(pitches.length);
+    expect(back.original).toBeNull();
   });
 
   it('an empty draft cannot be finished; cancel returns to the empty workbench', () => {
@@ -305,5 +308,72 @@ describe('new-melody mode', () => {
     expect(back.ok && back.notes.map((n) => [n.pitch, n.startTick, n.durationTick])).toEqual(
       m.notes.map((n) => [n.pitch, n.startTick, n.durationTick]),
     );
+  });
+});
+
+describe('replacing a project is undoable (no silent data loss)', () => {
+  const failure = {
+    stage: 'midi' as const,
+    fileName: 'bad.mid',
+    errors: [{ code: 'NOT_MIDI', message: '' }],
+    warnings: [],
+  };
+  /** Loaded, strict, plus one manual edit. */
+  const edited = () =>
+    reducer(strict(), { type: 'EDIT_PITCH', noteId: 'jianpu:n0', toPitch: 62, createdAt: 2 });
+
+  const cases: Array<[string, Action]> = [
+    ['LOADED (another file)', { type: 'LOADED', input: loadFixture('mode-church-c-dorian.mid') }],
+    ['NEW_MELODY', { type: 'NEW_MELODY' }],
+    ['RESET', { type: 'RESET' }],
+  ];
+  for (const [name, action] of cases) {
+    it(`${name} → UNDO restores original, generated, custom and view`, () => {
+      const s = edited();
+      const replaced = reducer(s, action);
+      expect(replaced.custom).toBeNull();
+      const back = reducer(replaced, { type: 'UNDO' });
+      for (const k of ['input', 'original', 'analysis', 'generated', 'custom', 'view'] as const)
+        expect(back[k]).toBe(s[k]);
+      expect(back.custom!.variant.notes[0]!.pitch).toBe(62);
+      expect(back.draft).toBeNull();
+      // And redo replaces it again.
+      expect(reducer(back, { type: 'REDO' }).custom).toBeNull();
+    });
+  }
+
+  it('LOAD_FAILED keeps the project and its edits; nothing to undo', () => {
+    const s = edited();
+    const failed = reducer(s, { type: 'LOAD_FAILED', failure });
+    expect(failed.loadFailure?.errors[0]?.code).toBe('NOT_MIDI');
+    expect(failed.custom).toBe(s.custom);
+    expect(failed.original).toBe(s.original);
+    expect(failed.history).toBe(s.history);
+  });
+
+  it('a new draft abandoned with 放弃 is two undo steps from the project', () => {
+    const s = edited();
+    const cancelled = [
+      { type: 'NEW_MELODY' },
+      { type: 'DRAFT_ADD', pitch: 60, startTick: 0 },
+      { type: 'DRAFT_CANCEL' },
+    ].reduce((st, a) => reducer(st, a as Action), s);
+    const back = [1, 2, 3].reduce((st) => reducer(st, { type: 'UNDO' }), cancelled);
+    expect(back.custom).toBe(s.custom);
+    expect(back.draft).toBeNull();
+  });
+
+  it('a track change on a multi-track file is undoable', () => {
+    const t0 = run(
+      { type: 'LOADED', input: loadFixture('type0-multichannel.mid') },
+      { type: 'SELECT_TRACK', trackId: 'track-0' },
+      { type: 'GENERATE', createdAt: 1 },
+      { type: 'EDIT_PITCH', noteId: 'nope', toPitch: 60, createdAt: 1 },
+    );
+    const id = t0.original!.notes[0]!.id;
+    const e = reducer(t0, { type: 'EDIT_PITCH', noteId: id, toPitch: 70, createdAt: 2 });
+    const other = reducer(e, { type: 'SELECT_TRACK', trackId: 'track-1' });
+    expect(other.custom).toBeNull();
+    expect(reducer(other, { type: 'UNDO' }).custom).toBe(e.custom);
   });
 });

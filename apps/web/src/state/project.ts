@@ -174,11 +174,13 @@ export interface ProjectState {
   history: History;
 }
 
-/** The part of the state undo/redo restores (spec §10.6). */
-export type Snapshot = Pick<
-  ProjectState,
-  'target' | 'sourceOverride' | 'generated' | 'custom' | 'view' | 'draft'
->;
+/**
+ * The part of the state undo/redo restores (spec §10.6): the whole project,
+ * so replacing it (another file, 新建旋律, a track change) is undoable too.
+ * Not restored: the history itself, the snap preference, the selection and
+ * the last load error.
+ */
+export type Snapshot = Omit<ProjectState, 'history' | 'snap' | 'selectedNoteId' | 'loadFailure'>;
 
 export interface History {
   past: readonly Snapshot[];
@@ -317,7 +319,6 @@ function select(state: ProjectState, trackId: string | null, repair: boolean): P
     custom: null,
     view: 'original',
     selectedNoteId: null,
-    history: EMPTY_HISTORY,
   };
   if (!input || trackId === null) return base;
   if (input.kind === 'midi') {
@@ -541,10 +542,8 @@ function customChanges(
       toPitch: n.pitch,
       reasonCode: MANUAL_EDIT,
       explanation:
-        `Manual edit: ${pitchName(from)} → ${pitchName(n.pitch)}` +
-        (b !== undefined && b !== from && b !== n.pitch
-          ? ` (the generated variant had ${pitchName(b)}).`
-          : '.'),
+        `手动修改：${pitchName(from)} → ${pitchName(n.pitch)}` +
+        (b !== undefined && b !== from && b !== n.pitch ? `（生成结果为 ${pitchName(b)}）` : ''),
     });
   });
   return out;
@@ -622,8 +621,16 @@ function editPitch(
 }
 
 const snapshot = (s: ProjectState): Snapshot => ({
-  target: s.target,
+  input: s.input,
+  trackId: s.trackId,
+  repair: s.repair,
+  validation: s.validation,
+  limitError: s.limitError,
+  repairPreview: s.repairPreview,
+  original: s.original,
+  analysis: s.analysis,
   sourceOverride: s.sourceOverride,
+  target: s.target,
   generated: s.generated,
   custom: s.custom,
   view: s.view,
@@ -635,6 +642,15 @@ const sameSnapshot = (a: Snapshot, b: Snapshot): boolean =>
 
 /** Actions that change what undo/redo restores. */
 const UNDOABLE: ReadonlySet<Action['type']> = new Set<Action['type']>([
+  // Replacing the project: a new file, another track, the repair toggle,
+  // 新建旋律, finishing or abandoning a draft, RESET.
+  'LOADED',
+  'SELECT_TRACK',
+  'SET_REPAIR',
+  'RESET',
+  'NEW_MELODY',
+  'DRAFT_FINISH',
+  'DRAFT_CANCEL',
   'SET_SOURCE_OVERRIDE',
   'SET_TARGET',
   'GENERATE',
@@ -681,12 +697,8 @@ function apply(state: ProjectState, action: Action): ProjectState {
       return select(fresh, only, false);
     }
     case 'LOAD_FAILED':
-      return {
-        ...initialState,
-        snap: state.snap,
-        target: state.target,
-        loadFailure: action.failure,
-      };
+      // A file that cannot be read never replaces the current project.
+      return { ...state, loadFailure: action.failure };
     case 'SELECT_TRACK':
       return select(state, action.trackId, false);
     case 'SET_REPAIR':
@@ -733,7 +745,7 @@ function apply(state: ProjectState, action: Action): ProjectState {
             action.noteId,
             n.pitch,
             action.createdAt,
-            `Reverted to the original ${pitchName(n.pitch)}.`,
+            `恢复原音：${pitchName(n.pitch)}`,
           )
         : state;
     }
@@ -820,8 +832,11 @@ export function reducer(state: ProjectState, action: Action): ProjectState {
       future: future.slice(1),
     });
   }
-  const next = apply(state, action);
-  if (next === state || !UNDOABLE.has(action.type)) return next;
+  // History is managed here only; `apply` never touches it.
+  const applied = apply(state, action);
+  if (applied === state) return state;
+  const next = applied.history === state.history ? applied : { ...applied, history: state.history };
+  if (!UNDOABLE.has(action.type)) return next;
   const before = snapshot(state);
   if (sameSnapshot(before, snapshot(next))) return next;
   return {

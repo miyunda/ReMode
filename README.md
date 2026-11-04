@@ -243,9 +243,10 @@ What M2b adds (details in
 - **Manual editing** only changes pitch. Drag a note vertically, use ↑/↓ on the focused roll
   (Shift+↑/↓ for an octave), or use the inspector buttons. Edits snap to the target scale
   unless you turn snapping off. The first edit forks `custom` from the variant on screen.
-  Every edit is a `MANUAL_EDIT` change (`remode-manual/1.0.0`), and ticks, IDs and velocity
+  Every edit is a `MANUAL_EDIT` change (`remode-manual/1.0.1`), and ticks, IDs and velocity
   never change. Undo/redo (buttons, Ctrl/⌘+Z, Shift+Ctrl/⌘+Z, Ctrl+Y) covers edits, reverts,
-  target and source settings and generation, up to 100 steps. “恢复原样” resets Custom to the
+  target and source settings, generation, and replacing the project (another file, another
+  track, 新建旋律), up to 100 steps. A file that fails to load never replaces the current project. “恢复原样” resets Custom to the
   original pitches.
 - **New-melody mode** (“新建旋律”): set the key, time signature, tempo and grid, then add
   notes by click or Enter, move and resize them, and delete them. “完成并分析” makes the

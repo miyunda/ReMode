@@ -8,8 +8,8 @@ import { isValidMidiPitch, mod, pitchName } from '../theory/pitch.js';
 import { getScale } from '../theory/scales.js';
 import { degreeLabel, type ModeRef } from './scaleMapping.js';
 
-/** Bump whenever manual-edit behaviour changes (CLAUDE.md rule 6). */
-export const MANUAL_EDIT_VERSION = 'remode-manual/1.0.0';
+/** Bump whenever manual-edit behaviour changes (CLAUDE.md rule 6). 1.0.1: Chinese explanations. */
+export const MANUAL_EDIT_VERSION = 'remode-manual/1.0.1';
 
 export const MANUAL_EDIT = 'MANUAL_EDIT';
 
@@ -105,7 +105,7 @@ export function applyManualEdit(
       fromPitch: note.pitch,
       toPitch,
       reasonCode: MANUAL_EDIT,
-      explanation: explanation ?? `Manual edit: ${pitchName(note.pitch)} → ${pitchName(toPitch)}.`,
+      explanation: explanation ?? `手动修改：${pitchName(note.pitch)} → ${pitchName(toPitch)}`,
     },
   };
 }

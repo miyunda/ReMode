@@ -112,7 +112,7 @@ export function NoteTable({
               {shown.map(({ n, i, o, c }) => {
                 const delta = n.pitch - o.pitch;
                 const sel = n.id === selectedId;
-                const out = target !== null && c !== undefined && !inMode(n.pitch, target);
+                const out = target !== null && !inMode(n.pitch, target);
                 return (
                   <tr
                     key={n.id}

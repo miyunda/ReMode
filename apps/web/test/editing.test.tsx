@@ -126,3 +126,54 @@ describe('new-melody mode', () => {
     expect(screen.getAllByTestId('candidate').length).toBeGreaterThan(0);
   });
 });
+
+describe('review fixes', () => {
+  it('the note table flags a note kept outside the target scale by `preserve`, like the roll', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(screen.getByLabelText('简谱文本'), "1=C 4/4 | 1 2 3 #4 | 5 6 7 1' |");
+    await user.click(screen.getByRole('button', { name: '分析简谱' }));
+    const picker = screen.getByTestId('source-picker');
+    await user.selectOptions(within(picker).getByLabelText('体系'), 'church');
+    await user.selectOptions(within(picker).getByLabelText('调式'), 'ionian');
+    await user.click(screen.getByRole('button', { name: '使用此来源调式' }));
+    await user.selectOptions(screen.getByLabelText(/调外音策略/), 'preserve');
+    await user.click(screen.getByRole('button', { name: '生成 Strict' }));
+    await user.click(screen.getByTestId('table-all'));
+    // F#4 is unchanged (preserved), not a change, and still outside C Dorian.
+    const fsharp = row('jianpu:n3');
+    expect(fsharp).toHaveTextContent('未改动');
+    expect(fsharp).toHaveTextContent('不在目标音阶内');
+    expect(row('jianpu:n0')).not.toHaveTextContent('不在目标音阶内');
+    await user.click(within(fsharp).getByRole('button'));
+    expect(document.querySelector('li[data-code="OUT_OF_TARGET_SCALE"]')).not.toBeNull();
+  });
+
+  it('the draft BPM field follows undo and a later blur does not re-apply the undone value', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByTestId('new-melody'));
+    const bpm = screen.getByTestId('draft-bpm');
+    await user.clear(bpm);
+    await user.type(bpm, '120');
+    await user.tab();
+    expect(bpm).toHaveValue('120');
+    await user.click(screen.getByRole('button', { name: /撤销/ }));
+    expect(bpm).toHaveValue('96');
+    await user.click(bpm);
+    await user.tab();
+    expect(bpm).toHaveValue('96');
+    expect(screen.getByRole('button', { name: /重做/ })).toBeEnabled();
+  });
+
+  it('the mode caption shows the name only; the scale ID is a tooltip', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: '填入示例' }));
+    await user.click(screen.getByRole('button', { name: '分析简谱' }));
+    const caption = screen.getByTestId('target-picker-name');
+    expect(caption).toHaveTextContent(/^C Dorian$/);
+    expect(caption).toHaveAttribute('title', 'scaleId: dorian');
+    expect(document.body.textContent).not.toMatch(/Doriandorian|五声）pentatonic/);
+  });
+});

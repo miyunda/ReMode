@@ -66,6 +66,7 @@ describe('manual edit helpers', () => {
     expect(notes[1]?.pitch).toBe(64);
     expect(r.change).toMatchObject({ noteId: 'b', fromPitch: 64, toPitch: 63 });
     expect(r.change.reasonCode).toBe('MANUAL_EDIT');
+    expect(r.change.explanation).toBe('手动修改：E4 → Eb4');
     expect(applyManualEdit(notes, 'x', 60)).toMatchObject({ ok: false, code: 'UNKNOWN_NOTE' });
     expect(applyManualEdit(notes, 'a', 128)).toMatchObject({ ok: false, code: 'INVALID_PITCH' });
     expect(applyManualEdit(notes, 'a', 60)).toMatchObject({ ok: false, code: 'NO_CHANGE' });

@@ -16,7 +16,8 @@ export function DraftPanel() {
   const dispatch = useDispatch();
   const ids = { key: useId(), sig: useId(), bpm: useId(), q: useId() };
   const [jianpu, setJianpu] = useState<ReturnType<typeof writeJianpu> | null>(null);
-  const [bpmText, setBpmText] = useState(String(draft?.settings.bpm ?? 96));
+  // Text being typed; null when not editing, so the field follows the draft (and undo).
+  const [bpmEdit, setBpmEdit] = useState<string | null>(null);
   const meta = useMemo(
     () =>
       draft
@@ -141,14 +142,16 @@ export function DraftPanel() {
             id={ids.bpm}
             className="field w-20"
             inputMode="numeric"
-            value={bpmText}
-            onChange={(e) => setBpmText(e.target.value)}
+            value={bpmEdit ?? String(s.bpm)}
+            onChange={(e) => setBpmEdit(e.target.value)}
             onBlur={() => {
-              const n = Math.round(Number(bpmText));
-              const bpm = Number.isFinite(n) && n >= 20 && n <= 300 ? n : s.bpm;
-              setBpmText(String(bpm));
-              if (bpm !== s.bpm) set({ bpm });
+              if (bpmEdit === null) return;
+              const n = Math.round(Number(bpmEdit));
+              setBpmEdit(null);
+              if (bpmEdit.trim() !== '' && Number.isFinite(n) && n >= 20 && n <= 300 && n !== s.bpm)
+                set({ bpm: n });
             }}
+            data-testid="draft-bpm"
           />
         </label>
         <label htmlFor={ids.q} className="flex flex-col gap-1 font-medium">
