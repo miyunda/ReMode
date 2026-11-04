@@ -263,6 +263,18 @@ export function ChangeInspector() {
               <pre className="max-w-full overflow-x-auto rounded-lg border border-hl-med bg-base p-2 font-mono text-xs">
                 {jianpu.text}
               </pre>
+              {jianpu.warnings.length > 0 && (
+                <ul className="flex flex-col gap-2" data-testid="jianpu-warnings">
+                  {jianpu.warnings.map((w, i) => (
+                    <Issue key={i} level="warning" code={w.code} detail={w.message}>
+                      <p className="text-xs break-words text-muted-text">
+                        音符：{w.noteIds.slice(0, 12).join('、')}
+                        {w.noteIds.length > 12 && ` 等 ${w.noteIds.length} 个`}
+                      </p>
+                    </Issue>
+                  ))}
+                </ul>
+              )}
             </>
           ) : (
             <ul className="flex flex-col gap-2" role="alert">

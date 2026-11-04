@@ -709,7 +709,7 @@ v1 不包含 AI，也不写任何服务端代码：部署形态是只含静态�
 - **其他**：`//` 起行注释；`||` 视同一条小节线；记号之间可不留空格（`1_2_3_`）；固定力度 96/127；音符 ID 为 `jianpu:n<k>`（按出现顺序，休止不占号）。
 - **错误与警告**：错误一律带 `line`、`column`（1 起）与代码，解析会报告全部错误而非只报第一个。连音、圆括号/方括号/花括号 → `UNSUPPORTED_TUPLET`，`~ ^ * tr` 等 → `UNSUPPORTED_ORNAMENT`，`|:` `:|` `%` → `UNSUPPORTED_REPEAT`，三条减时线与双附点 → `UNSUPPORTED_DURATION`，重升重降 → `UNSUPPORTED_ACCIDENTAL`。小节时值与拍号不符只是 `BAR_DURATION_MISMATCH` 警告（含弱起小节）。
 - **限制**：文本 ≤ 100 000 字符、音符 ≤ 20 000，与 MIDI 导入一致。
-- **反向写出（M2b，`writeJianpu`，`packages/core/src/text/jianpuWriter.ts`）**：旋律 → 同一语法的文本，经 `parseJianpu` 读回后音高与 tick 完全相同（fast-check 往返测试）。音符写成“头（`1` / `1_` / `1__`，可带附点）+ 整拍 `-`”，休止在拍点和小节线处拆开，`1=` 取调号（新建旋律取所选调）。多个速度或拍号、重叠、无法换算到 PPQ 480 的 tick、非十六分音符倍数的时值都报结构化错误，从不取整。
+- **反向写出（M2b，`writeJianpu`，`packages/core/src/text/jianpuWriter.ts`）**：旋律 → 同一语法的文本，经 `parseJianpu` 读回后**音高与 tick** 完全相同（fast-check 往返测试）；力度不写入。音符写成“头（`1` / `1_` / `1__`，可带附点）+ 整拍 `-`”。休止按小节线拆开（休止永不跨小节线），小节内做精确分解：优先在拍点断开、片数最少，只有别无精确写法时才让一段休止跨拍。`1=` 取调号（新建旋律取所选调）。多个速度或拍号、重叠、无法换算到 PPQ 480 的 tick、无法写出的音符时值或休止都报结构化错误，从不取整。能写出 tick 但语法表达不了的信息给结构化警告：`VELOCITY_DROPPED`（力度不是 96/127 的音，一条警告列出全部）、`BAR_CROSSING_NOTE`（不在拍点上跨小节线的音；没有连线语法，该处小节线写不出，读回时报 `BAR_DURATION_MISMATCH`）。连线语法留待以后（会改变本节语法与解析器版本）。
 
 ---
 

@@ -123,6 +123,8 @@ const LABELS: Readonly<Record<string, string>> = {
   PPQ_NOT_DIVISIBLE: 'PPQ 无法精确换算',
   UNREPRESENTABLE_DURATION: '简谱无法表示此时值',
   UNREPRESENTABLE_REST: '简谱无法表示此休止',
+  VELOCITY_DROPPED: '力度未写入简谱',
+  BAR_CROSSING_NOTE: '音符跨小节线（简谱无连线）',
 };
 
 export const codeLabel = (code: string): string => LABELS[code] ?? code;

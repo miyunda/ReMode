@@ -1,12 +1,21 @@
-// Melody → jianpu text in the `remode-jianpu/1.0.0` syntax (spec §10.8), the
-// inverse of parseJianpu for what the syntax can express: one key, one time
-// signature, one tempo, no overlaps, and durations made of a head (1, 1_, 1__,
-// with an optional dot) plus whole-beat extenders `-`. Anything else is a
-// structured error, never a silent rounding of the timing (CLAUDE.md rule 4).
+// Melody → jianpu text in the `remode-jianpu/1.0.0` syntax (spec §10.8).
+// Pitches and ticks read back exactly through parseJianpu: one key, one time
+// signature, one tempo, no overlaps, note durations made of a head (1, 1_, 1__,
+// with an optional dot) plus whole-beat extenders `-`, and rests that add up
+// exactly. Timing that cannot be written is a structured error, never a
+// rounding (CLAUDE.md rule 4). What the syntax cannot carry but the timing
+// survives is a structured warning: velocities (jianpu has no dynamics here,
+// every note reads back as JIANPU_VELOCITY) and notes that cross a barline
+// off the beat (no tie syntax, so that bar's barline cannot be placed).
 
 import type { MelodyNote, MidiMetadata } from '../types.js';
 import { mod, pitchClassName } from '../theory/pitch.js';
-import { JIANPU_PARSER_VERSION, JIANPU_PPQ, JIANPU_REFERENCE_OCTAVE } from './jianpu.js';
+import {
+  JIANPU_PARSER_VERSION,
+  JIANPU_PPQ,
+  JIANPU_REFERENCE_OCTAVE,
+  JIANPU_VELOCITY,
+} from './jianpu.js';
 
 export type JianpuWriteErrorCode =
   | 'NO_NOTES'
@@ -25,6 +34,14 @@ export interface JianpuWriteError {
   noteIds?: string[];
 }
 
+export type JianpuWriteWarningCode = 'VELOCITY_DROPPED' | 'BAR_CROSSING_NOTE';
+
+export interface JianpuWriteWarning {
+  code: JianpuWriteWarningCode;
+  message: string;
+  noteIds: string[];
+}
+
 export interface WriteJianpuOptions {
   /** Pitch class written as `1=`; default: the first key signature, else C. */
   keyPitchClass?: number;
@@ -33,7 +50,8 @@ export interface WriteJianpuOptions {
 }
 
 export type WriteJianpuResult =
-  { ok: true; text: string; syntaxVersion: string } | { ok: false; errors: JianpuWriteError[] };
+  | { ok: true; text: string; syntaxVersion: string; warnings: JianpuWriteWarning[] }
+  | { ok: false; errors: JianpuWriteError[] };
 
 const KEY_PC: Readonly<Record<string, number>> = {
   C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7,
@@ -66,29 +84,68 @@ function noteShape(ticks: number): { suffix: string; extenders: number } | null 
   return null;
 }
 
-/** Rest pieces for a gap: whole beats as `0`, fractions as `0_` / `0__` / dotted. */
-function restPieces(
-  from: number,
-  to: number,
-  boundaries: (t: number) => number,
-): Array<{ text: string; end: number }> | null {
+/** Every head length is a multiple of this. */
+const REST_UNIT = 60;
+
+/**
+ * Exact rest pieces for [from, to) inside one bar: the fewest pieces that
+ * break on beats, and only when no such split exists a piece that crosses a
+ * beat. Null when no combination of heads adds up to the gap.
+ */
+function restSegment(from: number, to: number): Array<{ text: string; end: number }> | null {
+  const len = to - from;
+  if (len % REST_UNIT !== 0) return null;
+  const n = len / REST_UNIT;
+  const crossesBeat = (p: number, h: number) =>
+    Math.floor(p / JIANPU_PPQ) !== Math.floor((p + h - 1) / JIANPU_PPQ);
+  // best[i]: cost of filling from + i·unit to `to`; a beat crossing outweighs any piece count.
+  const best = new Array<number>(n + 1).fill(Infinity);
+  const pick = new Array<number>(n + 1).fill(-1);
+  best[n] = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    const p = from + i * REST_UNIT;
+    HEADS.forEach(([h], k) => {
+      const j = i + h / REST_UNIT;
+      if (j > n) return;
+      const cost = (best[j] as number) + 1 + (crossesBeat(p, h) ? 1000 : 0);
+      if (cost < (best[i] as number)) {
+        best[i] = cost;
+        pick[i] = k;
+      }
+    });
+  }
+  if (!Number.isFinite(best[0])) return null;
   const out: Array<{ text: string; end: number }> = [];
-  let t = from;
-  while (t < to) {
-    const end = Math.min(to, boundaries(t));
-    let len = end - t;
-    while (len > 0) {
-      const head = HEADS.find(([h]) => h <= len && h <= JIANPU_PPQ);
-      if (!head) return null;
-      len -= head[0];
-      t += head[0];
-      out.push({ text: `0${head[1]}`, end: t });
-    }
+  for (let i = 0; i < n;) {
+    const [h, suffix] = HEADS[pick[i] as number] as (typeof HEADS)[number];
+    i += h / REST_UNIT;
+    out.push({ text: `0${suffix}`, end: from + i * REST_UNIT });
   }
   return out;
 }
 
-/** Melody → jianpu text that parseJianpu reads back to the same pitches and ticks. */
+/** Rests for a gap, split at every barline (a rest never crosses one). */
+function restPieces(
+  from: number,
+  to: number,
+  barTicks: number,
+): Array<{ text: string; end: number }> | null {
+  const out: Array<{ text: string; end: number }> = [];
+  for (let t = from; t < to;) {
+    const end = Math.min(to, (Math.floor(t / barTicks) + 1) * barTicks);
+    const piece = restSegment(t, end);
+    if (!piece) return null;
+    out.push(...piece);
+    t = end;
+  }
+  return out;
+}
+
+/**
+ * Melody → jianpu text that parseJianpu reads back to the same pitches and
+ * ticks. Velocities are not written (see `VELOCITY_DROPPED`), so the round
+ * trip is exact for pitch and timing only.
+ */
 export function writeJianpu(
   notes: readonly MelodyNote[],
   metadata: Pick<MidiMetadata, 'ppq' | 'tempoMap' | 'timeSignatures' | 'keySignatures'>,
@@ -146,12 +203,8 @@ export function writeJianpu(
   const keyPc = mod(options.keyPitchClass ?? (ks !== undefined ? (KEY_PC[ks] ?? 0) : 0), 12);
   const reference = keyPc + (JIANPU_REFERENCE_OCTAVE + 1) * 12;
   const barTicks = (sig.numerator * 4 * JIANPU_PPQ) / sig.denominator;
-  // Rests break at every beat and every barline.
-  const nextBoundary = (t: number) =>
-    Math.min(
-      (Math.floor(t / JIANPU_PPQ) + 1) * JIANPU_PPQ,
-      (Math.floor(t / barTicks) + 1) * barTicks,
-    );
+  const warnings: JianpuWriteWarning[] = [];
+  const crossing: string[] = [];
 
   // Tokens with the tick they end at; barlines go between tokens on bar boundaries.
   const tokens: Array<{ text: string; end: number }> = [];
@@ -160,11 +213,11 @@ export function writeJianpu(
     const start = toTicks(n.startTick);
     const ticks = toTicks(n.durationTick);
     if (start > t) {
-      const rests = restPieces(t, start, nextBoundary);
+      const rests = restPieces(t, start, barTicks);
       if (!rests) {
         errors.push({
           code: 'UNREPRESENTABLE_REST',
-          message: `The gap before ${n.id} is not a multiple of a sixteenth.`,
+          message: `The ${start - t}-tick gap before ${n.id} (PPQ ${JIANPU_PPQ}) cannot be written as rests: rest pieces (0, 0_, 0__, optionally dotted) are 120–720 ticks in steps of 60 and may not cross a barline.`,
           noteIds: [n.id],
         });
         return { ok: false, errors };
@@ -186,14 +239,39 @@ export function writeJianpu(
       (offset - (MAJOR[degree - 1] as number) - (acc === '#' ? 1 : acc === 'b' ? -1 : 0)) / 12;
     const marks = octave > 0 ? "'".repeat(octave) : ','.repeat(-octave);
     let end = start + ticks - shape.extenders * JIANPU_PPQ;
+    const ends = [end];
     tokens.push({ text: `${acc}${degree}${marks}${shape.suffix}`, end });
     for (let k = 0; k < shape.extenders; k++) {
       end += JIANPU_PPQ;
+      ends.push(end);
       tokens.push({ text: '-', end });
+    }
+    // A barline inside the note is written only where a token ends on it.
+    for (let b = (Math.floor(start / barTicks) + 1) * barTicks; b < start + ticks; b += barTicks) {
+      if (!ends.includes(b)) {
+        crossing.push(n.id);
+        break;
+      }
     }
     t = start + ticks;
   }
   if (errors.length > 0) return { ok: false, errors };
+
+  const loud = notes.filter((n) => Math.abs(n.velocity - JIANPU_VELOCITY) > 1e-9).map((n) => n.id);
+  if (loud.length > 0) {
+    warnings.push({
+      code: 'VELOCITY_DROPPED',
+      message: `${loud.length} note(s) have a velocity other than ${Math.round(JIANPU_VELOCITY * 127)}/127; jianpu text has no dynamics, so they read back at ${Math.round(JIANPU_VELOCITY * 127)}/127.`,
+      noteIds: loud,
+    });
+  }
+  if (crossing.length > 0) {
+    warnings.push({
+      code: 'BAR_CROSSING_NOTE',
+      message: `${crossing.length} note(s) cross a barline off the beat; without tie syntax that barline cannot be written, so the bars around them merge (ticks are unchanged, parseJianpu reports BAR_DURATION_MISMATCH).`,
+      noteIds: crossing,
+    });
+  }
 
   const barsPerLine = options.barsPerLine ?? 4;
   const lines: string[] = [];
@@ -216,5 +294,6 @@ export function writeJianpu(
     ok: true,
     text: [header, ...lines].join('\n') + '\n',
     syntaxVersion: JIANPU_PARSER_VERSION,
+    warnings,
   };
 }

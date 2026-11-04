@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App';
@@ -175,5 +175,24 @@ describe('review fixes', () => {
     expect(caption).toHaveTextContent(/^C Dorian$/);
     expect(caption).toHaveAttribute('title', 'scaleId: dorian');
     expect(document.body.textContent).not.toMatch(/Doriandorian|五声）pentatonic/);
+  });
+});
+
+describe('jianpu export warnings', () => {
+  it('an off-beat note across the barline exports with a BAR_CROSSING_NOTE warning', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:remode-test');
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByTestId('new-melody'));
+    for (let i = 0; i < 8; i++) key('Enter'); // eighths at 0 … 1680
+    key('ArrowRight', { altKey: true }); // last note → a quarter, 1680–2160
+    await user.click(screen.getByTestId('draft-jianpu'));
+    const result = screen.getByTestId('draft-jianpu-result');
+    expect(result).toHaveTextContent('BAR_CROSSING_NOTE');
+    expect(result).toHaveTextContent('音符跨小节线');
+    expect(result).toHaveTextContent('new:n7'); // the IDs the notes get when the draft is finished
+    vi.restoreAllMocks();
   });
 });

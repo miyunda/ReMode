@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   JIANPU_PPQ,
+  JIANPU_VELOCITY,
   applyManualEdit,
   degreeOf,
   inMode,
@@ -22,7 +23,7 @@ const note = (id: string, pitch: number, startTick: number, durationTick = 480):
   pitch,
   startTick,
   durationTick,
-  velocity: 0.75,
+  velocity: JIANPU_VELOCITY,
 });
 
 describe('manual edit helpers', () => {
@@ -106,7 +107,7 @@ describe('writeJianpu', () => {
     const parsed = parseJianpu(text);
     if (!parsed.ok) throw new Error('parse');
     const r = writeJianpu(parsed.notes, parsed.metadata);
-    expect(r).toEqual({ ok: true, text, syntaxVersion: 'remode-jianpu/1.0.0' });
+    expect(r).toEqual({ ok: true, text, syntaxVersion: 'remode-jianpu/1.0.0', warnings: [] });
   });
 
   it('spells accidentals and octaves against the key', () => {
@@ -178,6 +179,114 @@ describe('writeJianpu', () => {
           expect(back.notes.map((n) => [n.pitch, n.startTick, n.durationTick])).toEqual(
             notes.map((n) => [n.pitch, n.startTick, n.durationTick]),
           );
+        },
+      ),
+      SEED,
+    );
+  });
+});
+
+describe('writeJianpu: review fixes', () => {
+  const back = (text: string) => {
+    const r = parseJianpu(text);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    return r;
+  };
+  const ticks = (ns: readonly MelodyNote[]) =>
+    ns.map((n) => [n.pitch, n.startTick, n.durationTick]);
+
+  it('warns once with every note whose velocity jianpu cannot carry', () => {
+    const notes = [
+      note('a', 60, 0),
+      { ...note('b', 62, 480), velocity: 0.2 },
+      { ...note('c', 64, 960), velocity: 1 },
+    ];
+    const r = writeJianpu(notes, META);
+    if (!r.ok) throw new Error('write');
+    expect(r.warnings).toEqual([
+      expect.objectContaining({ code: 'VELOCITY_DROPPED', noteIds: ['b', 'c'] }),
+    ]);
+    expect(back(r.text).notes.map((n) => n.velocity)).toEqual([
+      JIANPU_VELOCITY,
+      JIANPU_VELOCITY,
+      JIANPU_VELOCITY,
+    ]);
+  });
+
+  it('writes a 540-tick gap exactly (360 + 180), crossing the beat only because it must', () => {
+    const notes = [note('a', 60, 0, 120), note('b', 62, 660, 120)];
+    const r = writeJianpu(notes, META);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.text).toContain('1__ 0_. 0__. 2__');
+    expect(ticks(back(r.text).notes)).toEqual(ticks(notes));
+  });
+
+  it('still refuses a gap with no decomposition, with an accurate message', () => {
+    const r = writeJianpu([note('a', 60, 0, 120), note('b', 62, 180, 120)], META);
+    expect(r).toMatchObject({
+      ok: false,
+      errors: [{ code: 'UNREPRESENTABLE_REST', noteIds: ['b'] }],
+    });
+    expect(!r.ok && r.errors[0]?.message).toMatch(
+      /60-tick gap.*120–720 ticks in steps of 60.*barline/,
+    );
+  });
+
+  it('rests never cross a barline', () => {
+    // Gap 1800..2160 crosses the barline at 1920: 120 before, 240 after.
+    const notes = [note('a', 60, 1680, 120), note('b', 62, 2160)];
+    const r = writeJianpu(notes, META);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.text).toContain('1__ 0__ | 0_ 2');
+    const parsed = back(r.text);
+    expect(
+      parsed.warnings.filter((w) => w.code === 'BAR_DURATION_MISMATCH').map((w) => w.bar?.index),
+    ).toEqual([2]);
+    expect(ticks(parsed.notes)).toEqual(ticks(notes));
+  });
+
+  it('a beat-aligned note across the barline keeps correct bars, with no warning', () => {
+    const notes = [note('a', 60, 0, 1440), note('b', 62, 1440, 960), note('c', 64, 2400, 1440)];
+    const r = writeJianpu(notes, META);
+    if (!r.ok) throw new Error('write');
+    expect(r.text).toBe('1=C 4/4 bpm=96\n| 1 - - 2 | - 3 - - |\n');
+    expect(r.warnings).toEqual([]);
+    expect(back(r.text).warnings).toEqual([]);
+  });
+
+  it('an off-beat note across the barline is exported with BAR_CROSSING_NOTE; ticks stay exact', () => {
+    const notes = [note('a', 60, 0, 1800), note('b', 62, 1800, 480), note('c', 64, 2280, 1560)];
+    const r = writeJianpu(notes, META);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.warnings).toEqual([
+      expect.objectContaining({ code: 'BAR_CROSSING_NOTE', noteIds: ['b'] }),
+    ]);
+    const parsed = back(r.text);
+    expect(ticks(parsed.notes)).toEqual(ticks(notes));
+    expect(parsed.warnings.some((w) => w.code === 'BAR_DURATION_MISMATCH')).toBe(true);
+  });
+
+  it('every gap of k·60 ≥ 120 ticks inside one bar round-trips exactly or is reported', () => {
+    const BAR = 1920;
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: BAR / 60 - 1 }),
+        fc.integer({ min: 2, max: BAR / 60 }),
+        (s, g) => {
+          const start = s * 60;
+          const gapFrom = start + 120;
+          const gap = g * 60;
+          fc.pre(Math.floor(gapFrom / BAR) === Math.floor((gapFrom + gap - 1) / BAR));
+          const notes = [note('a', 60, start, 120), note('b', 62, gapFrom + gap, 120)];
+          const r = writeJianpu(notes, META);
+          if (!r.ok) {
+            // Only the leading rest before `a` (from tick 0) may be impossible, e.g. 60 ticks.
+            expect(r.errors.map((e) => [e.code, e.noteIds])).toEqual([
+              ['UNREPRESENTABLE_REST', ['a']],
+            ]);
+            return;
+          }
+          expect(ticks(back(r.text).notes)).toEqual(ticks(notes));
         },
       ),
       SEED,
